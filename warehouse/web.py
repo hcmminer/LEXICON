@@ -66,7 +66,7 @@ def catalog(
 ):
     if lang not in LANGUAGES:
         lang = "zh"
-    max_rank = min(max(max_rank, 1), 50000)
+    max_rank = min(max(max_rank, 1), 100000)
     limit = 40
     rows, total = search_catalog(lang, q, max_rank, limit=limit, offset=(page - 1) * limit)
     pages = max((total + limit - 1) // limit, 1)
@@ -122,7 +122,7 @@ def export_preview(
 ):
     if pivot not in LANGUAGES:
         raise HTTPException(400, "Unknown pivot language")
-    top_n = min(max(int(top_n), 1), 20000)
+    top_n = min(max(int(top_n), 1), 100000)
     catalog = build_catalog(top_n=top_n, pivot=pivot, target_langs=target_langs)
     
     # Return summary + sample 10 items
@@ -146,7 +146,7 @@ def export_download(
 ):
     if pivot not in LANGUAGES:
         raise HTTPException(400, "Unknown pivot language")
-    top_n = min(max(int(top_n), 1), 20000)
+    top_n = min(max(int(top_n), 1), 100000)
     catalog = build_catalog(top_n=top_n, pivot=pivot, target_langs=target_langs)
     import gzip
     import json
