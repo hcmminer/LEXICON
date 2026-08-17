@@ -3,13 +3,16 @@ PIP ?= .venv/bin/pip
 export PYTHONPATH := .
 export DATABASE_URL ?= postgresql:///dictionary?host=/tmp
 
-.PHONY: venv install migrate ingest-smoke ingest rank export export-zh-3000 validate smoke app
+.PHONY: venv install download migrate ingest-smoke ingest rank export export-zh-3000 validate smoke app
 
 venv:
 	python3 -m venv .venv
 
 install: venv
 	$(PIP) install -r requirements.txt
+
+download:
+	$(PYTHON) -m warehouse.download_sources
 
 migrate:
 	$(PYTHON) -m warehouse migrate

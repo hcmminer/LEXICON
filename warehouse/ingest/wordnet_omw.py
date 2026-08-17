@@ -6,12 +6,15 @@ from pathlib import Path
 from schema import OMW_LANG_TO_ISO, WORDNET_POS_TO_OURS
 from warehouse.config import CACHE
 from warehouse.db import connect, executemany
+from warehouse.download_sources import ensure_data_source
 from warehouse.textutil import clean_lemma, is_usable_lemma, normalize, script_ok
 
 NLTK_DATA = CACHE / "nltk_data"
 
 
 def _ensure_nltk() -> None:
+    ensure_data_source("wordnet")
+    ensure_data_source("omw")
     os.environ.setdefault("NLTK_DATA", str(NLTK_DATA))
     import nltk
 

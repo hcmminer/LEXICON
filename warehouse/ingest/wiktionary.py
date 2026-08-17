@@ -8,6 +8,7 @@ from pathlib import Path
 from schema import WIKT_CODE_TO_ISO, WIKT_POS_TO_OURS
 from warehouse.config import CACHE
 from warehouse.db import connect, executemany
+from warehouse.download_sources import ensure_data_source
 from warehouse.textutil import is_usable_lemma, normalize, script_ok
 
 KAIKKI = CACHE / "kaikki.org-dictionary-English.jsonl.gz"
@@ -39,6 +40,7 @@ def _translations(entry: dict) -> dict[str, list[str]]:
 
 
 def ingest_wiktionary(max_entries: int | None = None) -> None:
+    ensure_data_source("wiktionary")
     if not KAIKKI.exists():
         raise SystemExit(f"missing {KAIKKI}")
 
