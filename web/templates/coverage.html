@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="page">
+  <div>
+    <p class="kicker">Warehouse</p>
+    <h1>Coverage</h1>
+  </div>
+  <dl class="metrics">
+    <div><dt>Catalog</dt><dd>{{ '{:,}'.format(stats.catalog_size) }}</dd></div>
+    <div><dt>Synsets</dt><dd>{{ '{:,}'.format(stats.counts.synsets or 0) }}</dd></div>
+    <div><dt>Lemmas</dt><dd>{{ '{:,}'.format(stats.counts.lemmas or 0) }}</dd></div>
+    <div><dt>Alignments</dt><dd>{{ '{:,}'.format(stats.counts.sense_lemmas or 0) }}</dd></div>
+  </dl>
+</header>
+
+<section>
+  <h2>Languages</h2>
+  <table>
+    <thead><tr><th>Lang</th><th>Filled</th><th>Max rank</th><th></th></tr></thead>
+    <tbody>
+    {% for row in stats.coverage %}
+      <tr>
+        <td><a href="/catalog?lang={{ row.lang }}&max_rank=3000">{{ row.lang }}</a></td>
+        <td>{{ '{:,}'.format(row.filled) }}</td>
+        <td>{{ row.max_rank }}</td>
+        <td class="bar"><span style="width: {{ (row.filled / max_fill * 100) if max_fill else 0 }}%"></span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Ingest runs</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Rows</th><th>Finished</th><th>Notes</th></tr></thead>
+    <tbody>
+    {% for run in stats.runs %}
+      <tr>
+        <td>{{ run.source_id }}</td>
+        <td>{{ run.row_count }}</td>
+        <td>{{ run.finished_at }}</td>
+        <td class="muted">{{ run.notes or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

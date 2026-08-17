@@ -110,7 +110,8 @@ def ingest_omw() -> None:
             iso = OMW_LANG_TO_ISO.get(omw_lang)
             if iso is None:
                 continue
-            inserted = 0
+            lemmas: dict[str, str] = {}
+            links: list[tuple[str, str]] = []
             with tab.open(encoding="utf-8", errors="replace") as handle:
                 for line in handle:
                     parts = line.rstrip("\n").split("\t")
@@ -130,21 +131,35 @@ def ingest_omw() -> None:
                     if synset_id is None:
                         continue
                     lemma = clean_lemma(parts[2].replace("+", ""))
-                    lemma_id = _upsert_lemma(conn, iso, lemma)
-                    if lemma_id is None:
+                    if not is_usable_lemma(lemma) or not script_ok(iso, lemma):
                         continue
-                    conn.execute(
-                        """
-                        INSERT INTO core.sense_lemmas (synset_id, lemma_id, source_id)
-                        VALUES (%s, %s, 'omw-1.4')
-                        ON CONFLICT DO NOTHING
-                        """,
-                        (synset_id, lemma_id),
-                    )
-                    inserted += 1
+                    norm = normalize(lemma)
+                    lemmas[norm] = lemma
+                    links.append((synset_id, norm))
+            if lemmas:
+                executemany(
+                    conn,
+                    """
+                    INSERT INTO core.lemmas (lang, text, normalized)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (lang, normalized) DO NOTHING
+                    """,
+                    [(iso, text, norm) for norm, text in lemmas.items()],
+                )
+                executemany(
+                    conn,
+                    """
+                    INSERT INTO core.sense_lemmas (synset_id, lemma_id, source_id)
+                    SELECT %s, l.id, 'omw-1.4'
+                    FROM core.lemmas l
+                    WHERE l.lang = %s AND l.normalized = %s
+                    ON CONFLICT DO NOTHING
+                    """,
+                    [(synset_id, iso, norm) for synset_id, norm in links],
+                )
             conn.commit()
-            count += inserted
-            print(f"  omw {iso}: {inserted}")
+            count += len(links)
+            print(f"  omw {iso}: {len(links)}")
         conn.execute(
             """
             INSERT INTO core.ingest_runs (source_id, finished_at, row_count)

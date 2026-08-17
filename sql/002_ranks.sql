@@ -1,5 +1,3 @@
-TRUNCATE core.concept_ranks;
-
 WITH preferred AS (
     SELECT DISTINCT ON (sl.synset_id, l.lang)
         sl.synset_id,
@@ -14,11 +12,18 @@ WITH preferred AS (
     WHERE fw.normalized IS NULL
     ORDER BY sl.synset_id, l.lang, l.zipf DESC NULLS LAST, l.id
 ),
-catalog AS (
+seeded AS (
     SELECT DISTINCT synset_id
     FROM preferred
     WHERE wordfreq_rank IS NOT NULL
       AND wordfreq_rank <= %(top_n)s
+),
+catalog AS (
+    SELECT p.synset_id
+    FROM preferred p
+    JOIN seeded s ON s.synset_id = p.synset_id
+    GROUP BY p.synset_id
+    HAVING BOOL_OR(p.lang = 'en') AND COUNT(*) >= 2
 )
 INSERT INTO core.concept_ranks (synset_id, lang, rank, lemma_id)
 SELECT

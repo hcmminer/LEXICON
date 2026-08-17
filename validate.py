@@ -9,7 +9,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from schema import LANGUAGES, POS_VALUES, READING_KEYS, SCHEMA_VERSION, SYNSET_ID_RE
+from phonology import phonology_dto, system_ids_for
+from schema import LANGUAGES, POS_VALUES, SCHEMA_VERSION, SYNSET_ID_RE
 
 SYNSET_RE = re.compile(SYNSET_ID_RE)
 
@@ -35,9 +36,13 @@ def _validate_term(lang: str, term: Any, concept_id: str) -> int:
         readings = term["readings"]
         _require(isinstance(readings, dict), f"{prefix}.readings must be an object")
         _require(len(readings) > 0, f"{prefix}.readings must be omitted when empty")
+        allowed = system_ids_for(lang)
         for key, value in readings.items():
-            _require(isinstance(key, str) and key.strip() != "", f"{prefix}.readings has empty key")
-            _require(isinstance(value, str) and value.strip() != "", f"{prefix}.readings.{key} must be a non-empty string")
+            _require(key in allowed, f"{prefix}.readings.{key} is not declared for {lang}")
+            _require(
+                value is None or (isinstance(value, str) and value.strip() != ""),
+                f"{prefix}.readings.{key} must be a non-empty string or null",
+            )
     return rank
 
 
@@ -49,13 +54,16 @@ def validate_document(data: Any) -> tuple[list[str], dict[str, int]]:
     _require(isinstance(data.get("sources"), list) and data["sources"], "sources must be a non-empty array")
     _require(isinstance(data.get("topN"), int) and data["topN"] >= 1, "topN must be an integer >= 1")
     languages = data.get("languages")
-    _require(languages == list(LANGUAGES), "languages must be the locked 35 ISO codes in order")
-    reading_keys = data.get("readingKeys")
-    _require(reading_keys == list(READING_KEYS), "readingKeys must match the published registry")
+    _require(isinstance(languages, list) and len(languages) > 0, "languages must be a non-empty list")
+    _require(all(lang in LANGUAGES for lang in languages), "languages contains unsupported codes")
+    _require(data.get("phonology") == phonology_dto(languages), "phonology must match the per-language registry")
     concepts = data.get("concepts")
     _require(isinstance(concepts, list), "concepts must be an array")
     _require(data.get("count") == len(concepts), "count must equal concepts.length")
     _require(len(concepts) > 0, "concepts must not be empty")
+    pivot = data.get("pivot")
+    if pivot is not None:
+        _require(pivot in LANGUAGES, f"pivot {pivot!r} is not a supported language")
 
     ids: list[str] = []
     coverage = {lang: 0 for lang in LANGUAGES}
@@ -80,15 +88,19 @@ def validate_document(data: Any) -> tuple[list[str], dict[str, int]]:
             rank = _validate_term(lang, term, concept_id)
             ranks_by_lang[lang].append(rank)
             coverage[lang] += 1
-        _require("en" in terms, f"{concept_id} is missing terms.en")
-        _require(len(terms) >= 2, f"{concept_id} needs en + at least one other language")
+        if pivot:
+            _require(pivot in terms, f"{concept_id} is missing terms.{pivot}")
+        else:
+            _require("en" in terms, f"{concept_id} is missing terms.en")
+            _require(len(terms) >= 2, f"{concept_id} needs en + at least one other language")
 
     _require(len(ids) == len(set(ids)), f"duplicate ids: {[i for i, n in Counter(ids).items() if n > 1]}")
     for lang, ranks in ranks_by_lang.items():
         _require(len(ranks) == len(set(ranks)), f"duplicate {lang} ranks")
-        expected = list(range(1, len(ranks) + 1))
-        if sorted(ranks) != expected:
-            raise ValidationError(f"{lang} ranks must be the contiguous range 1..{len(ranks)}")
+        if pivot is None or lang == pivot:
+            expected = list(range(1, len(ranks) + 1))
+            if sorted(ranks) != expected:
+                raise ValidationError(f"{lang} ranks must be the contiguous range 1..{len(ranks)}")
 
     return warnings, coverage
 
@@ -119,7 +131,7 @@ def self_test() -> None:
         "generatedAt": "2026-08-17T00:00:00Z",
         "sources": ["wordfreq", "omw-1.4", "wiktextract"],
         "languages": list(LANGUAGES),
-        "readingKeys": list(READING_KEYS),
+        "phonology": phonology_dto(LANGUAGES),
         "topN": 12000,
         "count": 2,
         "concepts": [
@@ -180,6 +192,25 @@ def self_test() -> None:
         raise AssertionError("expected missing term rank to fail")
     except ValidationError:
         pass
+
+    null_reading = json.loads(json.dumps(good))
+    null_reading["concepts"][0]["terms"]["zh"]["readings"] = {"pinyin": "chī", "zhuyin": None}
+    validate_document(null_reading)
+
+    unknown_system = json.loads(json.dumps(good))
+    unknown_system["concepts"][0]["terms"]["vi"]["readings"] = {"pinyin": "an"}
+    try:
+        validate_document(unknown_system)
+        raise AssertionError("expected undeclared reading system to fail")
+    except ValidationError:
+        pass
+
+    pivoted = json.loads(json.dumps(good))
+    pivoted["pivot"] = "zh"
+    pivoted["concepts"] = [pivoted["concepts"][0]]
+    pivoted["count"] = 1
+    pivoted["concepts"][0]["terms"]["zh"]["rank"] = 1
+    validate_document(pivoted)
 
     print("self-test ok")
 

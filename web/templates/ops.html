@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="page">
+  <div>
+    <p class="kicker">Control plane</p>
+    <h1>Operations</h1>
+    <p class="lede">One job at a time. Rank and export are safe. Ingest rewrites warehouse tables.</p>
+  </div>
+  <p class="pill {% if job.running %}live{% endif %}">
+    {% if job.running %}running {{ job.name }}{% elif job.name %}last: {{ job.name }}{% else %}idle{% endif %}
+  </p>
+</header>
+
+<div class="ops">
+  {% for name, label, hint in ops %}
+  <form method="post" action="/ops/run">
+    <input type="hidden" name="name" value="{{ name }}">
+    <button type="submit" {% if job.running %}disabled{% endif %}>{{ label }}</button>
+    <p>{{ hint }}</p>
+  </form>
+  {% endfor %}
+</div>
+
+{% if job.log %}
+<pre class="log">{% for line in job.log %}{{ line }}
+{% endfor %}</pre>
+{% endif %}
+{% if job.error %}<p class="error">{{ job.error }}</p>{% endif %}
+{% endblock %}

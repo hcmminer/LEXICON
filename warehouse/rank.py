@@ -7,6 +7,8 @@ from warehouse.db import connect
 def compute_ranks(top_n: int) -> None:
     sql = (SQL_DIR / "002_ranks.sql").read_text(encoding="utf-8")
     with connect() as conn:
+        conn.execute("TRUNCATE core.concept_ranks")
+        conn.execute("SET LOCAL work_mem = '256MB'")
         conn.execute(sql, {"top_n": top_n})
         stats = conn.execute(
             """

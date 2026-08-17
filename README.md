@@ -18,6 +18,7 @@ GitHub / academic dumps   →   ingest (once)
 
 - One concept = one WordNet synset (`eat.v.01`).
 - `rank` lives on `terms.<lang>`, never on the concept.
+- `phonology` declares pronunciation systems **per language**. Term `readings` may omit a system or set it `null`; unknown ids are invalid. Fill later via API.
 - Catalog = **union of top-N lemmas per language**.
 - Missing translation → omit the key. Never invent a lemma.
 - `rank <= 1000|3000|5000|8000|12000` is the slice.
@@ -25,6 +26,15 @@ GitHub / academic dumps   →   ingest (once)
 ```json
 {
   "version": 1,
+  "phonology": {
+    "zh": {
+      "systems": [
+        { "id": "pinyin", "label": "Hanyu Pinyin", "script": "latn", "learner": true },
+        { "id": "zhuyin", "label": "Zhuyin / Bopomofo", "script": "bopo", "learner": false },
+        { "id": "ipa", "label": "IPA", "script": "ipa", "learner": false }
+      ]
+    }
+  },
   "topN": 12000,
   "count": 28412,
   "concepts": [
@@ -33,7 +43,7 @@ GitHub / academic dumps   →   ingest (once)
       "pos": "verb",
       "meaning": "take in solid food",
       "terms": {
-        "en": { "text": "eat", "rank": 163, "readings": { "ipa": "/iːt/" } },
+        "en": { "text": "eat", "rank": 163, "readings": { "ipa": "/iːt/", "ipa-us": null } },
         "vi": { "text": "ăn", "rank": 48 },
         "zh": { "text": "吃", "rank": 77, "readings": { "pinyin": "chī" } }
       }
@@ -66,13 +76,23 @@ export DATABASE_URL=postgresql:///dictionary?host=/tmp
 make migrate
 ```
 
+## Console
+
+```bash
+make install
+make app            # http://127.0.0.1:8787
+```
+
+Coverage, catalog browse, pivot export (default ZH 3000), operations. Localhost only. No API keys.
+
 ## Commands
 
 ```bash
 make smoke          # tiny ingest + rank + export + validate
 make ingest         # full dumps (Wiktionary once)
 make rank           # rebuild ranks — seconds
-make export         # write JSON
+make export         # union JSON
+make export-zh-3000 # Chinese 3000 + 34 translations
 make validate
 ```
 

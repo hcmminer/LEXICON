@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="page">
+  <div>
+    <p class="kicker">{{ pos_map.get(synset.pos, synset.pos) }} · {{ synset.id }}</p>
+    <h1>{{ synset.id }}</h1>
+    <p class="lede">{{ synset.definition_en }}</p>
+  </div>
+</header>
+
+<table class="sheet">
+  <thead>
+    <tr>
+      <th>Lang</th>
+      <th>Text</th>
+      <th>Rank</th>
+      <th>Pronunciation slots</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for lang in languages %}
+    {% set term = terms.get(lang) %}
+    <tr>
+      <td class="mono">{{ lang }}</td>
+      <td>{% if term %}{{ term.text }}{% else %}<span class="null">null</span>{% endif %}</td>
+      <td class="num">{% if term %}{{ term.rank }}{% else %}<span class="null">—</span>{% endif %}</td>
+      <td>
+        {% for system in phonology[lang].systems %}
+          {% set value = (term.readings or {}).get(system.id) if term and term.readings else None %}
+          <span class="slot {% if value %}ok{% endif %}" title="{{ system.label }}">
+            <em>{{ system.id }}</em>
+            {% if value %}{{ value }}{% else %}null{% endif %}
+          </span>
+        {% endfor %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

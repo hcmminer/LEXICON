@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="page">
+  <div>
+    <p class="kicker">Publish & Inspect</p>
+    <h1>Export Custom Pack</h1>
+    <p class="lede">Choose your pivot master language, size, and select target secondary languages to export. Preview before downloading.</p>
+  </div>
+</header>
+
+<form id="exportForm" class="card export-grid" method="post" action="/export">
+  <div class="field">
+    <label>1. Pivot Master Language
+      <select name="pivot" id="pivotSelect">
+        {% for code in languages %}
+        <option value="{{ code }}" {% if code == default_pivot %}selected{% endif %}>{{ code }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="field">
+    <label>2. Volume (Top N)
+      <input type="number" name="top_n" id="topNInput" value="{{ default_n }}" min="1" max="20000">
+    </label>
+  </div>
+
+  <div class="field">
+    <label>3. Compression Format
+      <select name="fmt" id="fmtSelect">
+        <option value="json">JSON (.json)</option>
+        <option value="gz">Gzip (.json.gz)</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="field full-width">
+    <div class="lang-header">
+      <label>4. Select Secondary Target Languages</label>
+      <div class="quick-actions">
+        <button type="button" class="btn-sm" onclick="toggleAllLangs(true)">Select All</button>
+        <button type="button" class="btn-sm" onclick="toggleAllLangs(false)">Clear All</button>
+        <button type="button" class="btn-sm" onclick="selectCommonLangs()">Popular (EN, VI, ZH, JA, KO, ES, FR, DE)</button>
+      </div>
+    </div>
+    <div class="lang-checkbox-grid">
+      {% for code in languages %}
+      <label class="lang-checkbox-item">
+        <input type="checkbox" name="target_langs" value="{{ code }}" checked class="target-lang-cb">
+        <span>{{ code }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="actions full-width">
+    <button type="button" class="btn-secondary" onclick="runLivePreview()">👁️ Live Preview & Inspect Data</button>
+    <button type="submit" class="btn-primary">📥 Download Custom Pack</button>
+  </div>
+</form>
+
+<section id="previewSection" class="preview-panel" style="display: none;">
+  <div class="preview-header">
+    <h2>📋 Live Data Inspector</h2>
+    <div id="previewMeta" class="preview-badges"></div>
+  </div>
+
+  <div class="tabs">
+    <button type="button" class="tab-btn active" onclick="switchTab('tableTab')">Table View (10 Samples)</button>
+    <button type="button" class="tab-btn" onclick="switchTab('jsonTab')">Raw JSON View</button>
+  </div>
+
+  <div id="tableTab" class="tab-content active">
+    <div class="table-responsive">
+      <table id="sampleTable">
+        <thead>
+          <tr id="sampleTableHeader"></tr>
+        </thead>
+        <tbody id="sampleTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="jsonTab" class="tab-content">
+    <pre id="jsonViewer" class="json-box"></pre>
+  </div>
+</section>
+
+<script>
+function toggleAllLangs(check) {
+  document.querySelectorAll('.target-lang-cb').forEach(cb => cb.checked = check);
+}
+
+function selectCommonLangs() {
+  const common = new Set(['en', 'vi', 'zh', 'ja', 'ko', 'es', 'fr', 'de']);
+  document.querySelectorAll('.target-lang-cb').forEach(cb => {
+    cb.checked = common.has(cb.value);
+  });
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+async function runLivePreview() {
+  const form = document.getElementById('exportForm');
+  const formData = new FormData(form);
+  
+  const previewSec = document.getElementById('previewSection');
+  previewSec.style.display = 'block';
+  previewSec.scrollIntoView({ behavior: 'smooth' });
+
+  document.getElementById('previewMeta').innerHTML = '<em>Loading preview from PostgreSQL...</em>';
+
+  try {
+    const res = await fetch('/export/preview', {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Preview failed: ' + res.statusText);
+    const data = await res.json();
+
+    // Render Badges
+    document.getElementById('previewMeta').innerHTML = `
+      <span class="badge">Pivot: <b>${data.pivot}</b></span>
+      <span class="badge">Matched Concepts: <b>${data.count.toLocaleString()}</b></span>
+      <span class="badge">Languages Included: <b>${data.languages.length}</b></span>
+    `;
+
+    // Render Table
+    const headerTr = document.getElementById('sampleTableHeader');
+    headerTr.innerHTML = `<th># Rank (${data.pivot})</th><th>Synset ID</th><th>POS</th><th>English Gloss</th>`;
+    data.languages.forEach(lang => {
+      headerTr.innerHTML += `<th>${lang.toUpperCase()} Term</th>`;
+    });
+
+    const body = document.getElementById('sampleTableBody');
+    body.innerHTML = '';
+    data.sample.forEach(concept => {
+      const pivotTerm = concept.terms[data.pivot] || {};
+      let rowHtml = `
+        <td class="num">${pivotTerm.rank || '—'}</td>
+        <td class="mono"><a href="/catalog/${concept.id}" target="_blank">${concept.id}</a></td>
+        <td>${concept.pos}</td>
+        <td class="clip" title="${concept.meaning}">${concept.meaning}</td>
+      `;
+      data.languages.forEach(lang => {
+        const t = concept.terms[lang];
+        if (t) {
+          let extra = '';
+          if (t.readings && Object.keys(t.readings).length > 0) {
+            extra = `<span class="reading-hint">(${Object.values(t.readings).filter(Boolean).join(', ')})</span>`;
+          }
+          rowHtml += `<td><b>${t.text}</b> ${extra}</td>`;
+        } else {
+          rowHtml += `<td><span class="null">null</span></td>`;
+        }
+      });
+      body.innerHTML += `<tr>${rowHtml}</tr>`;
+    });
+
+    // Render Raw JSON Box
+    document.getElementById('jsonViewer').textContent = JSON.stringify(data.sample, null, 2);
+
+  } catch (err) {
+    document.getElementById('previewMeta').innerHTML = `<span class="error">${err.message}</span>`;
+  }
+}
+</script>
+{% endblock %}

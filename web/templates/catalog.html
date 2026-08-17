@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="page">
+  <div>
+    <p class="kicker">Browse</p>
+    <h1>Catalog</h1>
+  </div>
+  <p class="count">{{ '{:,}'.format(total) }} concepts</p>
+</header>
+
+<form class="filters" method="get" action="/catalog">
+  <label>Pivot
+    <select name="lang">
+      {% for code in languages %}
+      <option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ code }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Max rank
+    <input type="number" name="max_rank" value="{{ max_rank }}" min="1" max="50000">
+  </label>
+  <label class="grow">Search
+    <input type="search" name="q" value="{{ q }}" placeholder="lemma, synset, gloss">
+  </label>
+  <button type="submit">Apply</button>
+</form>
+
+<table>
+  <thead><tr><th>Rank</th><th>Lemma</th><th>POS</th><th>Synset</th><th>Meaning</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td class="num">{{ row.rank }}</td>
+      <td><a href="/catalog/{{ row.id }}">{{ row.text }}</a></td>
+      <td>{{ pos_map.get(row.pos, row.pos) }}</td>
+      <td class="mono"><a href="/catalog/{{ row.id }}">{{ row.id }}</a></td>
+      <td class="clip">{{ row.definition_en }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="?lang={{ lang }}&max_rank={{ max_rank }}&q={{ q }}&page={{ page - 1 }}">Prev</a>{% endif %}
+  <span>Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="?lang={{ lang }}&max_rank={{ max_rank }}&q={{ q }}&page={{ page + 1 }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -43,20 +43,6 @@ LANGUAGES: tuple[str, ...] = (
     "sw",
 )
 
-READING_KEYS: tuple[str, ...] = (
-    "ipa",
-    "ipa-us",
-    "ipa-gb",
-    "pinyin",
-    "zhuyin",
-    "jyutping",
-    "hiragana",
-    "romaji",
-    "rr",
-    "rtgs",
-    "alalc",
-)
-
 POS_VALUES = frozenset({"noun", "verb", "adjective", "adverb", "phrase", "other"})
 
 WORDNET_POS_TO_OURS = {
@@ -199,15 +185,23 @@ WORDFREQ_LANG = {
 
 SYNSET_ID_RE = r"^.+\.[nvasr]\.\d{2}$"
 
+from phonology import LANGUAGE_PHONOLOGY, phonology_dto
 
-def empty_envelope(count: int = 0, top_n: int = 0) -> dict[str, Any]:
-    return {
+if set(LANGUAGE_PHONOLOGY) != set(LANGUAGES):
+    raise RuntimeError("phonology registry languages do not match LANGUAGES")
+
+
+def empty_envelope(count: int = 0, top_n: int = 0, pivot: str | None = None) -> dict[str, Any]:
+    envelope = {
         "version": SCHEMA_VERSION,
         "generatedAt": "",
         "sources": list(SOURCES),
         "languages": list(LANGUAGES),
-        "readingKeys": list(READING_KEYS),
+        "phonology": phonology_dto(LANGUAGES),
         "topN": top_n,
         "count": count,
         "concepts": [],
     }
+    if pivot:
+        envelope["pivot"] = pivot
+    return envelope

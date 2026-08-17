@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · Lexicon</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <aside class="rail">
+    <a class="mark" href="/">LEXICON</a>
+    <p class="mark-sub">Core vocabulary warehouse</p>
+    <nav>
+      {% for href, label in nav %}
+      <a href="{{ href }}" {% if request.url.path == href or (href != '/' and request.url.path.startswith(href)) %}class="on"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <p class="foot">Local · free · no keys<br>127.0.0.1:8787</p>
+  </aside>
+  <main>
+    {% block body %}{% endblock %}
+  </main>
+</body>
+</html>
