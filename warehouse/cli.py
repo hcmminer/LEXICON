@@ -6,6 +6,7 @@ from pathlib import Path
 from warehouse.config import OUT_DIR
 from warehouse.db import migrate
 from warehouse.export_json import export_json
+from warehouse.export_sqlite import export_sqlite
 from warehouse.ingest.readings import ingest_readings
 from warehouse.ingest.seed import seed_reference_data
 from warehouse.ingest.wiktionary import ingest_wiktionary
@@ -43,6 +44,12 @@ def main() -> int:
     export.add_argument("--top-n", type=int, default=12000)
     export.add_argument("--pivot", type=str, help="pivot language for a pack export (e.g. zh)")
 
+    export_sqlite_cmd = sub.add_parser("export-sqlite", help="write lexicon-core.db")
+    export_sqlite_cmd.add_argument("--out", type=Path, default=OUT_DIR)
+    export_sqlite_cmd.add_argument("--top-n", type=int, default=12000)
+    export_sqlite_cmd.add_argument("--pivot", type=str)
+    export_sqlite_cmd.add_argument("--from-json", type=Path, help="convert an existing catalog JSON/JSON.GZ")
+
     args = parser.parse_args()
     if args.cmd == "app":
         from warehouse.web import run
@@ -72,6 +79,9 @@ def main() -> int:
         return 0
     if args.cmd == "export":
         export_json(args.out, args.top_n, args.pivot)
+        return 0
+    if args.cmd == "export-sqlite":
+        export_sqlite(args.out, args.top_n, args.pivot, args.from_json)
         return 0
     return 1
 
