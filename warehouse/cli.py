@@ -9,10 +9,24 @@ from warehouse.export_json import export_json
 from warehouse.export_sqlite import export_sqlite
 from warehouse.ingest.readings import ingest_readings
 from warehouse.ingest.seed import seed_reference_data
+from warehouse.ingest.llm_gaps import ingest_llm_gaps
+from warehouse.ingest.wikidata_lexemes import ingest_wikidata_lexemes
+from warehouse.ingest.wiktextract_native import ingest_wiktextract_native
 from warehouse.ingest.wiktionary import ingest_wiktionary
 from warehouse.ingest.wordfreq import ingest_wordfreq
 from warehouse.ingest.wordnet_omw import ingest_omw, ingest_wordnet
 from warehouse.rank import compute_ranks
+
+INGEST_ONLY = (
+    "wordfreq",
+    "wordnet",
+    "omw",
+    "wiktionary",
+    "readings",
+    "wiktextract-native",
+    "wikidata",
+    "llm-gaps",
+)
 
 
 def main() -> int:
@@ -32,7 +46,7 @@ def main() -> int:
     ingest.add_argument("--wordnet-only", action="store_true")
     ingest.add_argument(
         "--only",
-        choices=("wordfreq", "wordnet", "omw", "wiktionary", "readings"),
+        choices=INGEST_ONLY,
         help="run a single ingest step",
     )
 
@@ -73,6 +87,13 @@ def main() -> int:
             ingest_wiktionary(max_entries=args.limit)
         if only in (None, "readings") and not args.skip_readings:
             ingest_readings(limit=args.limit)
+        if only == "wiktextract-native":
+            ingest_wiktextract_native(max_entries=args.limit)
+        if only == "wikidata":
+            ingest_wikidata_lexemes(max_entities=args.limit)
+        if only == "llm-gaps":
+            ingest_llm_gaps(limit=args.limit)
+            compute_ranks(args.limit or 12000)
         return 0
     if args.cmd == "rank":
         compute_ranks(args.top_n)

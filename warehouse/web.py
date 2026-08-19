@@ -14,6 +14,9 @@ from warehouse.export_json import build_catalog, export_json
 from warehouse.curate_tier1 import apply_proposals, ambiguous_synsets, run_curation_batch
 from warehouse.ingest.readings import ingest_readings
 from warehouse.ingest.seed import seed_reference_data
+from warehouse.ingest.llm_gaps import ingest_llm_gaps
+from warehouse.ingest.wikidata_lexemes import ingest_wikidata_lexemes
+from warehouse.ingest.wiktextract_native import ingest_wiktextract_native
 from warehouse.ingest.wiktionary import ingest_wiktionary
 from warehouse.ingest.wordfreq import ingest_wordfreq
 from warehouse.ingest.wordnet_omw import ingest_omw, ingest_wordnet
@@ -53,6 +56,9 @@ OPS = (
     ("wiktionary", "Ingest Wiktionary", "Long. Gap fill."),
     ("wordnet", "Ingest WordNet", "Reload synsets"),
     ("seed", "Reseed languages", "Reference rows only"),
+    ("wiktextract-native", "Ingest native Wiktionary", "Long. Kaikki per-language dumps."),
+    ("wikidata", "Ingest Wikidata lexemes", "Long. P8814 only."),
+    ("llm-gaps", "LLM fill empty ranks", "Needs LLM config. Resumable."),
 )
 
 
@@ -197,6 +203,13 @@ def _job(name: str) -> None:
         ingest_wordnet()
     elif name == "seed":
         seed_reference_data()
+    elif name == "wiktextract-native":
+        ingest_wiktextract_native()
+    elif name == "wikidata":
+        ingest_wikidata_lexemes()
+    elif name == "llm-gaps":
+        ingest_llm_gaps()
+        compute_ranks(12000)
     else:
         raise ValueError(name)
 

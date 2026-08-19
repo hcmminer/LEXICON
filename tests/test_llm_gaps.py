@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from warehouse.cli import INGEST_ONLY
 from warehouse.ingest.llm_gaps import (
     accept_llm_lemma,
     backtranslate_ok,
@@ -72,3 +73,16 @@ def test_propose_lemma_rejects_bad_backtranslate_then_none_on_second_fail():
         is None
     )
     assert calls["n"] == 2
+
+
+def test_ops_and_cli_advertise_new_jobs():
+    from warehouse.web import OPS
+
+    names = {item[0] for item in OPS}
+    assert {"wiktextract-native", "wikidata", "llm-gaps"} <= names
+
+
+def test_ingest_only_includes_coverage_pipeline():
+    assert "wiktextract-native" in INGEST_ONLY
+    assert "wikidata" in INGEST_ONLY
+    assert "llm-gaps" in INGEST_ONLY
