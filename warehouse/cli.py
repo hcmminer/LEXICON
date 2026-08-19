@@ -93,7 +93,7 @@ def main() -> int:
             ingest_wikidata_lexemes(max_entities=args.limit)
         if only == "llm-gaps":
             ingest_llm_gaps(limit=args.limit)
-            compute_ranks(args.limit or 12000)
+            compute_ranks(12000)
         return 0
     if args.cmd == "rank":
         compute_ranks(args.top_n)

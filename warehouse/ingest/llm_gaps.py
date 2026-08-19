@@ -117,18 +117,75 @@ def propose_lemma(
     return None
 
 
-def ingest_llm_gaps(limit: int | None = None, job: Any | None = None) -> None:
+BATCH_SYSTEM_PROMPT = """You are a lexicographer. Given one WordNet synset, return the single most
+natural learner headword in EACH requested language for THIS sense only.
+Return JSON only: {"<lang>": {"lemma": "<native lemma>", "back_en": "<English lemma>"}, ...}.
+back_en must be one of the provided English lemmas."""
+
+
+def propose_lemmas_for_synset(
+    synset_id: str,
+    pos: str,
+    definition_en: str,
+    en_lemmas: list[str],
+    langs: list[str],
+    call_json: Callable[..., Any] | None = None,
+) -> dict[str, str]:
+    from warehouse.llm import call_chat_json
+
+    if not langs:
+        return {}
+    caller = call_json or call_chat_json
+    user = "\n".join(
+        [
+            f"Synset: {synset_id}",
+            f"POS: {pos}",
+            f"Definition: {definition_en}",
+            f"English lemmas: {', '.join(en_lemmas)}",
+            f"Languages: {', '.join(langs)}",
+        ]
+    )
+    accepted: dict[str, str] = {}
+    pending = list(langs)
+    for _ in range(2):
+        if not pending:
+            break
+        try:
+            payload = caller(BATCH_SYSTEM_PROMPT, user)
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        still: list[str] = []
+        for lang in pending:
+            raw = payload.get(lang)
+            if isinstance(raw, dict):
+                lemma = accept_llm_lemma(lang, str(raw.get("lemma") or ""))
+                back_en = str(raw.get("back_en") or "")
+            else:
+                lemma = accept_llm_lemma(lang, str(raw or ""))
+                back_en = ""
+            if lemma and (not back_en or backtranslate_ok(back_en, set(en_lemmas))):
+                accepted[lang] = lemma
+            else:
+                still.append(lang)
+        pending = still
+    return accepted
+
+
+def ingest_llm_gaps(limit: int | None = None, job: Any | None = None, top_n: int = 12000) -> None:
     cache = load_gap_cache()
     with connect() as conn:
         catalog_ids = [
             str(row["synset_id"])
             for row in conn.execute(
                 """
-                SELECT DISTINCT synset_id
+                SELECT synset_id
                 FROM core.concept_ranks
-                WHERE lang = 'en'
-                ORDER BY synset_id
-                """
+                WHERE lang = 'en' AND rank <= %s
+                ORDER BY rank
+                """,
+                (top_n,),
             )
         ]
         ranked = {
@@ -161,9 +218,15 @@ def ingest_llm_gaps(limit: int | None = None, job: Any | None = None) -> None:
             en_lemmas_by_synset.setdefault(str(row["synset_id"]), []).append(str(row["text"]))
 
         slots = missing_rank_slots(ranked, catalog_ids, LANGUAGES)
+        by_synset: dict[str, list[str]] = {}
+        for synset_id, lang in slots:
+            if not may_write_llm(existing_source.get((synset_id, lang))):
+                continue
+            by_synset.setdefault(synset_id, []).append(lang)
+        synsets = list(by_synset)
         if limit is not None:
-            slots = slots[:limit]
-        total = len(slots)
+            synsets = synsets[:limit]
+        total = len(synsets)
         pending_lemmas: list[tuple[str, str, str]] = []
         pending_links: list[tuple[str, str, str]] = []
         written = 0
@@ -195,37 +258,40 @@ def ingest_llm_gaps(limit: int | None = None, job: Any | None = None) -> None:
             pending_links.clear()
             conn.commit()
 
-        for index, (synset_id, lang) in enumerate(slots, start=1):
+        for index, synset_id in enumerate(synsets, start=1):
             if job is not None:
                 if job.cancelled():
-                    if job:
-                        job.log("cancelled")
+                    job.log("cancelled")
                     break
                 job.progress(index, total)
-            source = existing_source.get((synset_id, lang))
-            if not may_write_llm(source):
-                continue
-            key = gap_cache_key(synset_id, lang)
-            lemma = accept_llm_lemma(lang, cache.get(key, "")) if key in cache else None
-            if lemma is None:
+            langs = by_synset[synset_id]
+            found: dict[str, str] = {}
+            still: list[str] = []
+            for lang in langs:
+                key = gap_cache_key(synset_id, lang)
+                cached = accept_llm_lemma(lang, cache.get(key, "")) if key in cache else None
+                if cached:
+                    found[lang] = cached
+                else:
+                    still.append(lang)
+            if still:
                 pos, definition = meta.get(synset_id, ("other", ""))
-                lemma = propose_lemma(
+                proposed = propose_lemmas_for_synset(
                     synset_id,
                     pos,
                     definition,
                     en_lemmas_by_synset.get(synset_id, []),
-                    lang,
-                    [],
+                    still,
                 )
-                if lemma:
-                    cache[key] = lemma
-                    if index % 50 == 0:
-                        save_gap_cache(GAP_CACHE_FILE, cache)
-            if not lemma:
-                continue
-            pending_lemmas.append((lang, lemma, normalize(lemma)))
-            pending_links.append((synset_id, lang, normalize(lemma)))
-            written += 1
+                for lang, lemma in proposed.items():
+                    cache[gap_cache_key(synset_id, lang)] = lemma
+                    found[lang] = lemma
+                if index % 20 == 0:
+                    save_gap_cache(GAP_CACHE_FILE, cache)
+            for lang, lemma in found.items():
+                pending_lemmas.append((lang, lemma, normalize(lemma)))
+                pending_links.append((synset_id, lang, normalize(lemma)))
+                written += 1
             if len(pending_links) >= 200:
                 flush()
         flush()

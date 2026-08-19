@@ -53,6 +53,26 @@ def test_propose_lemma_accepts_valid_roundtrip():
     )
 
 
+def test_propose_lemmas_for_synset_accepts_valid_langs():
+    from warehouse.ingest.llm_gaps import propose_lemmas_for_synset
+
+    def fake_call(system, user, **kwargs):
+        return {
+            "vi": {"lemma": "nước", "back_en": "water"},
+            "zh": {"lemma": "water", "back_en": "water"},
+        }
+
+    got = propose_lemmas_for_synset(
+        "water.n.01",
+        "noun",
+        "a liquid",
+        ["water"],
+        ["vi", "zh"],
+        call_json=fake_call,
+    )
+    assert got == {"vi": "nước"}
+
+
 def test_propose_lemma_rejects_bad_backtranslate_then_none_on_second_fail():
     calls = {"n": 0}
 

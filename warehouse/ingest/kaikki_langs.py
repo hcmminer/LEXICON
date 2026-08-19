@@ -26,7 +26,7 @@ KAIKKI_NATIVE_LANGS: dict[str, str] = {
     "sv": "Swedish",
     "da": "Danish",
     "fi": "Finnish",
-    "no": "Norwegian Bokmål",
+    "no": "Norwegian",
     "hu": "Hungarian",
     "ro": "Romanian",
     "he": "Hebrew",
