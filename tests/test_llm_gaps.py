@@ -7,7 +7,9 @@ from warehouse.ingest.llm_gaps import (
     load_gap_cache,
     may_write_llm,
     missing_rank_slots,
+    pack_gap_slots,
     propose_lemma,
+    propose_lemmas_batch,
     save_gap_cache,
 )
 
@@ -51,6 +53,41 @@ def test_propose_lemma_accepts_valid_roundtrip():
         )
         == "nước"
     )
+
+
+def test_pack_gap_slots_respects_budget():
+    pending = [(f"c{i}.n.01", ["vi", "zh", "ja"]) for i in range(5)]
+    batches = pack_gap_slots(pending, slot_budget=6)
+    assert [sum(len(langs) for _, langs in batch) for batch in batches] == [6, 6, 3]
+
+
+def test_propose_lemmas_batch_accepts_multi_synset():
+    def fake_call(system, user, **kwargs):
+        assert "water.n.01" in user
+        assert "eat.v.01" in user
+        return {
+            "water.n.01": {"vi": {"lemma": "nước", "back_en": "water"}},
+            "eat.v.01": {"vi": {"lemma": "ăn", "back_en": "eat"}, "zh": {"lemma": "eat", "back_en": "eat"}},
+        }
+
+    items = [
+        {
+            "id": "water.n.01",
+            "pos": "noun",
+            "meaning": "a liquid",
+            "en_lemmas": ["water"],
+            "langs": ["vi"],
+        },
+        {
+            "id": "eat.v.01",
+            "pos": "verb",
+            "meaning": "take food",
+            "en_lemmas": ["eat"],
+            "langs": ["vi", "zh"],
+        },
+    ]
+    got = propose_lemmas_batch(items, call_json=fake_call)
+    assert got == {("water.n.01", "vi"): "nước", ("eat.v.01", "vi"): "ăn"}
 
 
 def test_propose_lemmas_for_synset_accepts_valid_langs():

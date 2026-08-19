@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable
 
@@ -17,6 +19,9 @@ GOLD_SOURCES = frozenset({
     "wikidata",
 })
 GAP_CACHE_FILE = Path(__file__).resolve().parents[1] / "llm_gap_cache.json"
+SLOT_BUDGET = 1200
+DEFAULT_WORKERS = 3
+BATCH_TIMEOUT = 180.0
 
 _LATIN_PRIMARY = frozenset({
     "es", "fr", "de", "pt", "id", "ms", "tr", "it", "nl", "pl",
@@ -73,6 +78,25 @@ def backtranslate_ok(proposed_en: str, synset_en_lemmas: set[str]) -> bool:
 
 def may_write_llm(existing_source: str | None) -> bool:
     return existing_source is None or existing_source not in GOLD_SOURCES
+
+
+def pack_gap_slots(
+    pending: list[tuple[str, list[str]]],
+    slot_budget: int = SLOT_BUDGET,
+) -> list[list[tuple[str, list[str]]]]:
+    batches: list[list[tuple[str, list[str]]]] = []
+    current: list[tuple[str, list[str]]] = []
+    slots = 0
+    for synset_id, langs in pending:
+        n = max(1, len(langs))
+        if current and slots + n > slot_budget:
+            batches.append(current)
+            current, slots = [], 0
+        current.append((synset_id, langs))
+        slots += n
+    if current:
+        batches.append(current)
+    return batches
 
 
 GAP_SYSTEM_PROMPT = """You are a lexicographer. Given one WordNet synset, return the single most
@@ -173,7 +197,75 @@ def propose_lemmas_for_synset(
     return accepted
 
 
-def ingest_llm_gaps(limit: int | None = None, job: Any | None = None, top_n: int = 12000) -> None:
+MULTI_SYSTEM_PROMPT = """You are a lexicographer. Given several WordNet synsets, return the single most
+natural learner headword in EACH requested language for THAT sense only.
+Return JSON only:
+{"<synset_id>": {"<lang>": {"lemma": "<native lemma>", "back_en": "<English lemma>"}}}.
+back_en must be one of that synset's English lemmas. Do not drop languages."""
+
+
+def propose_lemmas_batch(
+    items: list[dict[str, Any]],
+    call_json: Callable[..., Any] | None = None,
+    timeout: float = BATCH_TIMEOUT,
+) -> dict[tuple[str, str], str]:
+    from warehouse.llm import call_chat_json
+
+    if not items:
+        return {}
+    caller = call_json or call_chat_json
+    lines = [
+        "Fill the missing learner headword for every listed language of every synset.",
+        "",
+    ]
+    expected: dict[str, tuple[list[str], set[str]]] = {}
+    for item in items:
+        synset_id = str(item["id"])
+        en_lemmas = [str(x) for x in item.get("en_lemmas") or []]
+        langs = [str(x) for x in item.get("langs") or []]
+        expected[synset_id] = (langs, set(en_lemmas))
+        lines.append(
+            f"### {synset_id} | pos={item.get('pos','')} | EN: {item.get('meaning','')}"
+        )
+        lines.append(f"  English lemmas: {', '.join(en_lemmas)}")
+        lines.append(f"  Languages: {', '.join(langs)}")
+    lines.append("")
+    lines.append(
+        'Return ONLY JSON: {"<synset_id>": {"<lang>": {"lemma": "...", "back_en": "..."}}}.'
+    )
+    try:
+        payload = caller(MULTI_SYSTEM_PROMPT, "\n".join(lines), timeout=timeout, max_tokens=65536)
+    except TypeError:
+        payload = caller(MULTI_SYSTEM_PROMPT, "\n".join(lines))
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    accepted: dict[tuple[str, str], str] = {}
+    for synset_id, langs_and_en in expected.items():
+        langs, en_lemmas = langs_and_en
+        raw_syn = payload.get(synset_id)
+        if not isinstance(raw_syn, dict):
+            continue
+        for lang in langs:
+            raw = raw_syn.get(lang)
+            if isinstance(raw, dict):
+                lemma = accept_llm_lemma(lang, str(raw.get("lemma") or ""))
+                back_en = str(raw.get("back_en") or "")
+            else:
+                lemma = accept_llm_lemma(lang, str(raw or ""))
+                back_en = ""
+            if lemma and (not back_en or backtranslate_ok(back_en, en_lemmas)):
+                accepted[(synset_id, lang)] = lemma
+    return accepted
+
+
+def ingest_llm_gaps(
+    limit: int | None = None,
+    job: Any | None = None,
+    top_n: int = 12000,
+    workers: int = DEFAULT_WORKERS,
+) -> None:
     cache = load_gap_cache()
     with connect() as conn:
         catalog_ids = [
@@ -223,18 +315,32 @@ def ingest_llm_gaps(limit: int | None = None, job: Any | None = None, top_n: int
             en_lemmas_by_synset.setdefault(str(row["synset_id"]), []).append(str(row["text"]))
 
         slots = missing_rank_slots(ranked, catalog_ids, LANGUAGES)
-        by_synset: dict[str, list[str]] = {}
+        live: dict[str, list[str]] = {}
+        cached_hits: dict[str, dict[str, str]] = {}
         for synset_id, lang in slots:
             if not may_write_llm(existing_source.get((synset_id, lang))):
                 continue
-            by_synset.setdefault(synset_id, []).append(lang)
-        synsets = list(by_synset)
+            key = gap_cache_key(synset_id, lang)
+            cached = accept_llm_lemma(lang, cache.get(key, "")) if key in cache else None
+            if cached:
+                cached_hits.setdefault(synset_id, {})[lang] = cached
+            else:
+                live.setdefault(synset_id, []).append(lang)
+        pending = list(live.items())
         if limit is not None:
-            synsets = synsets[:limit]
-        total = len(synsets)
+            pending = pending[:limit]
+        batches = pack_gap_slots(pending)
+        slot_count = sum(len(langs) for _, langs in pending)
+        print(
+            f"llm-gaps pending_slots={slot_count} synsets={len(pending)} "
+            f"cached={sum(len(v) for v in cached_hits.values())} "
+            f"requests={len(batches)} slot_budget={SLOT_BUDGET} workers={workers}",
+            flush=True,
+        )
         pending_lemmas: list[tuple[str, str, str]] = []
         pending_links: list[tuple[str, str, str]] = []
         written = 0
+        lock = threading.Lock()
 
         def flush() -> None:
             if not pending_lemmas:
@@ -263,55 +369,71 @@ def ingest_llm_gaps(limit: int | None = None, job: Any | None = None, top_n: int
             pending_links.clear()
             conn.commit()
 
-        print(f"llm-gaps synsets={total} cached={sum(1 for s in synsets for lang in by_synset[s] if gap_cache_key(s, lang) in cache)}")
-        for index, synset_id in enumerate(synsets, start=1):
-            if job is not None:
-                if job.cancelled():
-                    job.log("cancelled")
-                    break
-                job.progress(index, total)
-            langs = by_synset[synset_id]
-            found: dict[str, str] = {}
-            still: list[str] = []
-            for lang in langs:
-                key = gap_cache_key(synset_id, lang)
-                cached = accept_llm_lemma(lang, cache.get(key, "")) if key in cache else None
-                if cached:
-                    found[lang] = cached
-                else:
-                    still.append(lang)
-            if still:
-                if index % 10 == 0 or index == 1:
-                    print(f"  llm-gaps {index}/{total} wrote={written} langs={len(still)}")
-                pos, definition = meta.get(synset_id, ("other", ""))
-                proposed = propose_lemmas_for_synset(
-                    synset_id,
-                    pos,
-                    definition,
-                    en_lemmas_by_synset.get(synset_id, []),
-                    still,
-                )
-                for lang, lemma in proposed.items():
-                    cache[gap_cache_key(synset_id, lang)] = lemma
-                    found[lang] = lemma
-                if index % 20 == 0:
-                    save_gap_cache(GAP_CACHE_FILE, cache)
-            for lang, lemma in found.items():
-                pending_lemmas.append((lang, lemma, normalize(lemma)))
-                pending_links.append((synset_id, lang, normalize(lemma)))
-                written += 1
-            if len(pending_links) >= 200:
-                flush()
+        def record(synset_id: str, lang: str, lemma: str) -> None:
+            nonlocal written
+            pending_lemmas.append((lang, lemma, normalize(lemma)))
+            pending_links.append((synset_id, lang, normalize(lemma)))
+            written += 1
+            cache[gap_cache_key(synset_id, lang)] = lemma
+
+        for synset_id, lemmas in cached_hits.items():
+            for lang, lemma in lemmas.items():
+                record(synset_id, lang, lemma)
         flush()
+
+        def run_batch(batch: list[tuple[str, list[str]]]) -> dict[tuple[str, str], str]:
+            items = []
+            for synset_id, langs in batch:
+                pos, meaning = meta.get(synset_id, ("other", ""))
+                items.append(
+                    {
+                        "id": synset_id,
+                        "pos": pos,
+                        "meaning": meaning,
+                        "en_lemmas": en_lemmas_by_synset.get(synset_id, []),
+                        "langs": langs,
+                    }
+                )
+            return propose_lemmas_batch(items)
+
+        if job is not None:
+            job.progress(0, max(len(batches), 1))
+        done_batches = 0
+        if batches:
+            with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+                futures = {pool.submit(run_batch, batch): i for i, batch in enumerate(batches, start=1)}
+                for future in as_completed(futures):
+                    if job is not None and job.cancelled():
+                        pool.shutdown(wait=False, cancel_futures=True)
+                        job.log("cancelled")
+                        break
+                    index = futures[future]
+                    try:
+                        proposed = future.result()
+                    except Exception as exc:
+                        print(f"  llm-gaps batch {index} failed: {exc}", flush=True)
+                        proposed = {}
+                    with lock:
+                        for (synset_id, lang), lemma in proposed.items():
+                            record(synset_id, lang, lemma)
+                        flush()
+                        save_gap_cache(GAP_CACHE_FILE, cache)
+                        done_batches += 1
+                    print(
+                        f"  llm-gaps batch {index}/{len(batches)} wrote={written} got={len(proposed)}",
+                        flush=True,
+                    )
+                    if job is not None:
+                        job.progress(done_batches, len(batches))
         save_gap_cache(GAP_CACHE_FILE, cache)
         conn.execute(
             """
             INSERT INTO core.ingest_runs (source_id, finished_at, row_count, notes)
             VALUES ('llm', now(), %s, %s)
             """,
-            (written, f"slots={total}"),
+            (written, f"slots={slot_count} requests={len(batches)}"),
         )
         conn.commit()
     if job is not None:
         job.log(f"wrote {written} llm lemmas")
-    print(f"llm-gaps wrote {written} / {total}")
+    print(f"llm-gaps wrote {written} slots via {len(batches)} requests")
