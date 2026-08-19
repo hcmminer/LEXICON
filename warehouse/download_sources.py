@@ -40,6 +40,15 @@ DATA_SOURCES = {
         "extract": False,
         "check_path": "kaikki.org-dictionary-English.jsonl.gz",
     },
+    "wikidata-lexemes": {
+        "filename": "latest-lexemes.json.gz",
+        "urls": [
+            "https://dumps.wikimedia.org/wikidatawiki/entities/latest-lexemes.json.gz",
+        ],
+        "dest_subdir": "",
+        "extract": False,
+        "check_path": "latest-lexemes.json.gz",
+    },
 }
 
 for _iso, _name in KAIKKI_NATIVE_LANGS.items():

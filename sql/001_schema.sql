@@ -95,5 +95,7 @@ INSERT INTO core.sources (id, name, version, license) VALUES
     ('wordnet', 'Princeton WordNet', '3.1', 'Princeton WordNet License'),
     ('wiktextract', 'Kaikki / wiktextract English dump', 'kaikki', 'CC BY-SA'),
     ('wiktextract-multilingual', 'Kaikki per-language Wiktionary dumps', 'kaikki', 'CC BY-SA'),
-    ('readings', 'Generated readings (pypinyin/kakasi/ipa)', '1', 'generated')
+    ('readings', 'Generated readings (pypinyin/kakasi/ipa)', '1', 'generated'),
+    ('wikidata', 'Wikidata lexemes (P8814 WordNet)', 'latest', 'CC0'),
+    ('llm', 'LLM gap-fill', '1', 'generated')
 ON CONFLICT (id) DO NOTHING;
