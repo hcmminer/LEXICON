@@ -173,6 +173,12 @@ make migrate
 # Ingest linguistic datasets (automatically downloads sources if not in cache)
 make ingest
 
+# Optional: fill empty (concept, lang) cells after the base ingest
+python -m warehouse ingest --only wiktextract-native
+python -m warehouse ingest --only wikidata
+python -m warehouse rank --top-n 12000
+python -m warehouse ingest --only llm-gaps
+
 # Calculate window-partitioned ranks (instantaneous SQL calculation)
 make rank
 ```
@@ -194,6 +200,8 @@ The ingestion engine will automatically download required dumps into `.cache/`. 
 | **Princeton WordNet** | `.cache/nltk_data/corpora/wordnet.zip` | • [NLTK Data Raw Repo](https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet.zip)<br>• [Princeton WordNet Official](https://wordnet.princeton.edu/) | ~10 MB |
 | **Open Multilingual WordNet (OMW 1.4)** | `.cache/nltk_data/corpora/omw-1.4.zip` | • [NLTK OMW 1.4 Raw Mirror](https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/omw-1.4.zip)<br>• [NTU OMW Official Project](http://compling.hss.ntu.edu.sg/omw/) | ~25 MB |
 | **English Wiktextract Dump** | `.cache/kaikki.org-dictionary-English.jsonl.gz` | • [Kaikki.org English JSONL Dump](https://kaikki.org/dictionary/English/kaikki.org-dictionary-English.jsonl.gz)<br>• [Wiktextract Project](https://github.com/tatuylonen/wiktextract) | ~480 MB |
+| **Native Wiktextract dumps** | `.cache/kaikki-native/*.jsonl.gz` | • [Kaikki.org per-language dictionaries](https://kaikki.org/dictionary/) | large |
+| **Wikidata lexemes** | `.cache/latest-lexemes.json.gz` | • [Wikimedia latest-lexemes](https://dumps.wikimedia.org/wikidatawiki/entities/latest-lexemes.json.gz) | large |
 
 You can also run the standalone source downloader anytime:
 ```bash
@@ -304,6 +312,9 @@ big-data/
 │       ├── wordfreq.py          # Wordfreq Zipf score ingestion
 │       ├── wordnet_omw.py       # Princeton WordNet & OMW 1.4 ingestion
 │       ├── wiktionary.py        # Wiktextract translation gap-filling
+│       ├── wiktextract_native.py# Native Kaikki dumps → existing synsets
+│       ├── wikidata_lexemes.py  # Wikidata P8814 → existing synsets
+│       ├── llm_gaps.py          # LLM fill for empty rank slots
 │       └── readings.py          # Bulk pronunciation generator
 └── web/
     ├── static/
