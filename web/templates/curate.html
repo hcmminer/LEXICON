@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="page">
+  <div>
+    <p class="kicker">Tier 1 · offline curation</p>
+    <h1>Curation</h1>
+    <p class="lede">Scan ambiguous concepts, let an LLM propose the best natural translation, review, apply, then re-export.</p>
+  </div>
+  <p class="pill {% if configured %}live{% endif %}">
+    {% if configured %}{{ model }} connected{% else %}not configured{% endif %}
+  </p>
+</header>
+
+<section class="card">
+  <h2>LLM API</h2>
+  {% if configured %}
+  <p class="muted">Connected to <code>{{ base_url }}</code> · key <code>{{ masked_key }}</code> · model <code>{{ model }}</code></p>
+  {% else %}
+  <p class="error">LLM is not configured yet. Add your OpenAI-compatible endpoint below (stored in local <code>.env</code>, git-ignored).</p>
+  {% endif %}
+  <form method="post" action="/curate/settings" class="row-form">
+    <label>Base URL <input name="base_url" value="{{ base_url }}" placeholder="http://localhost:20128/v1"></label>
+    <label>API key <input name="api_key" type="password" placeholder="sk-…"></label>
+    <label>Model <input name="model" value="{{ model }}" placeholder="ag/gemini-3.7-flash-high"></label>
+    <button type="submit">Save</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>1 · Scan ambiguous concepts</h2>
+  <div class="row-form">
+    <label>Language
+      <select id="scan-lang">
+        {% for code in languages %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Limit
+      <input id="scan-limit" type="number" value="20" min="1" max="200">
+    </label>
+    <button id="scan-btn" type="button">Scan</button>
+  </div>
+  <p id="scan-status" class="muted"></p>
+  <div id="scan-table"></div>
+  <p class="muted">Check concepts you want curated, then run the AI proposal step.</p>
+  <button id="run-btn" type="button" disabled>2 · Run AI curation</button>
+  <p id="run-status" class="muted"></p>
+</section>
+
+<section class="card">
+  <h2>3 · Review &amp; apply</h2>
+  <div id="proposal-table"></div>
+  <button id="apply-btn" type="button" disabled>Apply selected</button>
+  <p id="apply-status" class="muted"></p>
+</section>
+
+<section class="card">
+  <h2>4 · Re-export</h2>
+  <button id="export-btn" type="button">Re-export union + zh-3000</button>
+  <p id="export-status" class="muted"></p>
+</section>
+
+<script>
+async function postJSON(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { detail: text }; }
+  if (!res.ok) throw new Error(data.detail || text);
+  return data;
+}
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
+
+let scanned = [];
+let proposals = [];
+
+document.getElementById('scan-btn').addEventListener('click', async () => {
+  const status = document.getElementById('scan-status');
+  status.textContent = 'Scanning…';
+  try {
+    const data = await postJSON('/curate/scan', {
+      lang: document.getElementById('scan-lang').value,
+      limit: Number(document.getElementById('scan-limit').value),
+    });
+    scanned = data.rows || [];
+    proposals = [];
+    renderScan();
+    document.getElementById('run-btn').disabled = scanned.length === 0;
+    status.textContent = `${scanned.length} ambiguous concept(s) found.`;
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+});
+
+function renderScan() {
+  const host = document.getElementById('scan-table');
+  if (!scanned.length) { host.innerHTML = '<p class="muted">Nothing to show.</p>'; return; }
+  host.innerHTML = '<table><thead><tr><th></th><th>Synset</th><th>Rank</th><th>Headword</th><th>Ambiguity</th><th>Definition</th></tr></thead><tbody>' +
+    scanned.map((r) => `<tr>
+      <td><input type="checkbox" class="scan-check" value="${esc(r.synset_id)}"></td>
+      <td><code>${esc(r.synset_id)}</code></td>
+      <td>${r.rank ?? ''}</td>
+      <td>${esc(r.current_text)}</td>
+      <td>${r.synset_count}×</td>
+      <td>${esc(r.definition_en)}</td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  const checked = [...document.querySelectorAll('.scan-check:checked')].map((el) => el.value);
+  if (!checked.length) { alert('Select at least one concept.'); return; }
+  const status = document.getElementById('run-status');
+  status.textContent = `Running AI on ${checked.length} concept(s)… this can take a while.`;
+  document.getElementById('run-btn').disabled = true;
+  try {
+    const data = await postJSON('/curate/run', { items: checked, langs: ['vi', 'zh', 'en'] });
+    proposals = data.proposals || [];
+    renderProposals();
+    status.textContent = `${proposals.length} proposal(s) ready.`;
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  } finally {
+    document.getElementById('run-btn').disabled = scanned.length === 0;
+  }
+});
+
+function renderProposals() {
+  const host = document.getElementById('proposal-table');
+  if (!proposals.length) { host.innerHTML = '<p class="muted">No proposals yet.</p>'; return; }
+  const row = (p) => {
+    const cell = (lang) => {
+      const cur = p.current && p.current[lang];
+      const prop = p.proposed && p.proposed[lang];
+      const changed = prop && prop !== cur;
+      return `<td>${esc(cur ?? '—')}${changed ? ` → <strong>${esc(prop)}</strong>` : ''}</td>`;
+    };
+    return `<tr>
+      <td><input type="checkbox" class="prop-check" value="${esc(p.synset_id)}"></td>
+      <td><code>${esc(p.synset_id)}</code></td>
+      <td>${esc(p.meaning)}</td>
+      ${cell('vi')}${cell('zh')}${cell('en')}
+    </tr>`;
+  };
+  host.innerHTML = '<table><thead><tr><th></th><th>Synset</th><th>Definition</th><th>vi</th><th>zh</th><th>en</th></tr></thead><tbody>' +
+    proposals.map(row).join('') + '</tbody></table>';
+  document.getElementById('apply-btn').disabled = proposals.length === 0;
+}
+
+document.getElementById('apply-btn').addEventListener('click', async () => {
+  const selected = proposals.filter((p) =>
+    [...document.querySelectorAll('.prop-check:checked')].some((el) => el.value === p.synset_id));
+  if (!selected.length) { alert('Select at least one proposal.'); return; }
+  const status = document.getElementById('apply-status');
+  try {
+    const data = await postJSON('/curate/apply', { proposals: selected });
+    status.textContent = `Applied ${data.applied} concept(s) to curated_overrides.json.`;
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+});
+
+document.getElementById('export-btn').addEventListener('click', async () => {
+  const status = document.getElementById('export-status');
+  status.textContent = 'Exporting…';
+  try {
+    const data = await postJSON('/curate/export', {});
+    status.textContent = data.msg;
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+});
+</script>
+{% endblock %}

@@ -11,7 +11,7 @@ from phonology import system_ids_for
 from schema import LANGUAGES, SCHEMA_VERSION, SOURCES, WORDNET_POS_TO_OURS, empty_envelope
 from warehouse.config import OUT_DIR
 from warehouse.db import connect
-from validate import validate_document, write_coverage
+from warehouse.gloss_generator import load_gloss_cache
 
 
 def _term_from_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -77,6 +77,16 @@ def _fetch_rows(pivot: str | None, top_n: int) -> list[dict[str, Any]]:
         ).fetchall()
 
 
+def _load_curated_overrides() -> dict[str, dict[str, str]]:
+    overrides_file = Path(__file__).parent / "curated_overrides.json"
+    if overrides_file.exists():
+        try:
+            return json.loads(overrides_file.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
 def build_catalog(
     top_n: int = 12000,
     pivot: str | None = None,
@@ -86,6 +96,11 @@ def build_catalog(
     selected_langs = set(target_langs) if target_langs else set(LANGUAGES)
     if pivot:
         selected_langs.add(pivot)
+
+    from validate import validate_document, write_coverage
+
+    overrides = _load_curated_overrides()
+    gloss_cache = load_gloss_cache()
 
     for row in _fetch_rows(pivot, top_n):
         if row["lang"] not in selected_langs:
@@ -99,13 +114,34 @@ def build_catalog(
                 "terms": {},
             },
         )
-        concept["terms"][row["lang"]] = _term_from_row(row)
+        term = _term_from_row(row)
+        # Populate localized meaning if present in gloss cache
+        if row["synset_id"] in gloss_cache and row["lang"] in gloss_cache[row["synset_id"]]:
+            term["meaning"] = gloss_cache[row["synset_id"]][row["lang"]]
+        concept["terms"][row["lang"]] = term
+
+    # Apply curated overrides (both updating existing and filling missing verified terms)
+    for synset_id, override_terms in overrides.items():
+        if synset_id in grouped:
+            concept = grouped[synset_id]
+            for lang, text in override_terms.items():
+                if lang in selected_langs:
+                    if lang in concept["terms"]:
+                        concept["terms"][lang]["text"] = text
+                    else:
+                        concept["terms"][lang] = {"text": text, "rank": 99999}
 
     if pivot:
         concepts = [item for item in grouped.values() if pivot in item["terms"]]
+        by_lang: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for concept in concepts:
+            for lang, term in concept["terms"].items():
+                by_lang[lang].append(term)
+        for lang, terms in by_lang.items():
+            terms.sort(key=lambda term: (term.get("rank", 99999), term["text"]))
+            for rank, term in enumerate(terms, start=1):
+                term["rank"] = rank
         concepts.sort(key=lambda item: (item["terms"][pivot]["rank"], item["id"]))
-        for index, concept in enumerate(concepts, start=1):
-            concept["terms"][pivot]["rank"] = index
     else:
         concepts = [
             item
@@ -117,7 +153,7 @@ def build_catalog(
             for lang, term in concept["terms"].items():
                 by_lang[lang].append(term)
         for lang, terms in by_lang.items():
-            terms.sort(key=lambda term: (term["rank"], term["text"]))
+            terms.sort(key=lambda term: (term.get("rank", 99999), term["text"]))
             for rank, term in enumerate(terms, start=1):
                 term["rank"] = rank
         concepts.sort(key=lambda item: (item["terms"]["en"]["rank"], item["id"]))

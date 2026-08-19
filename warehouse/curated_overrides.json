@@ -1,0 +1,152 @@
+{
+  "preserve.v.04": {
+    "vi": "bảo quản",
+    "zh": "保鲜",
+    "en": "preserve"
+  },
+  "scope.n.01": {
+    "vi": "phạm vi",
+    "zh": "范围",
+    "en": "scope"
+  },
+  "jotting.n.01": {
+    "vi": "ghi chú",
+    "zh": "速记",
+    "en": "jotting"
+  },
+  "hankering.n.01": {
+    "vi": "khao khát",
+    "zh": "渴望",
+    "en": "hankering"
+  },
+  "keep.v.01": {
+    "vi": "giữ",
+    "zh": "保持",
+    "en": "keep"
+  },
+  "keep.v.08": {
+    "vi": "tiếp tục",
+    "zh": "继续",
+    "en": "keep"
+  },
+  "range.n.05": {
+    "vi": "phạm vi",
+    "zh": "范围",
+    "en": "range"
+  },
+  "employer.n.01": {
+    "vi": "người sử dụng lao động",
+    "zh": "雇主",
+    "en": "employer"
+  },
+  "difficult.a.01": {
+    "vi": "khó khăn",
+    "zh": "困难",
+    "en": "difficult"
+  },
+  "original.s.01": {
+    "vi": "ban đầu",
+    "zh": "最初的",
+    "en": "original"
+  },
+  "original.s.03": {
+    "vi": "nguyên bản",
+    "zh": "原创的",
+    "en": "original"
+  },
+  "water.n.01": {
+    "vi": "nước",
+    "zh": "水",
+    "en": "water"
+  },
+  "eat.v.01": {
+    "vi": "ăn",
+    "zh": "吃",
+    "en": "eat"
+  },
+  "drink.v.01": {
+    "vi": "uống",
+    "zh": "喝",
+    "en": "drink"
+  },
+  "house.n.01": {
+    "vi": "ngôi nhà",
+    "zh": "房屋",
+    "en": "house"
+  },
+  "school.n.01": {
+    "vi": "trường học",
+    "zh": "学校",
+    "en": "school"
+  },
+  "hospital.n.01": {
+    "vi": "bệnh viện",
+    "zh": "医院",
+    "en": "hospital"
+  },
+  "friend.n.01": {
+    "vi": "bạn bè",
+    "zh": "朋友",
+    "en": "friend"
+  },
+  "family.n.01": {
+    "vi": "gia đình",
+    "zh": "家庭",
+    "en": "family"
+  },
+  "teacher.n.01": {
+    "vi": "giáo viên",
+    "zh": "老师",
+    "en": "teacher"
+  },
+  "student.n.01": {
+    "vi": "học sinh",
+    "zh": "学生",
+    "en": "student"
+  },
+  "book.n.01": {
+    "vi": "sách",
+    "zh": "书",
+    "en": "book"
+  },
+  "learn.v.01": {
+    "vi": "học",
+    "zh": "学习",
+    "en": "learn"
+  },
+  "teach.v.01": {
+    "vi": "dạy",
+    "zh": "教",
+    "en": "teach"
+  },
+  "work.v.01": {
+    "vi": "làm việc",
+    "zh": "工作",
+    "en": "work"
+  },
+  "travel.v.01": {
+    "vi": "du lịch",
+    "zh": "旅行",
+    "en": "travel"
+  },
+  "money.n.01": {
+    "vi": "tiền",
+    "zh": "钱",
+    "en": "money"
+  },
+  "time.n.01": {
+    "vi": "thời gian",
+    "zh": "时间",
+    "en": "time"
+  },
+  "love.v.01": {
+    "vi": "yêu",
+    "zh": "爱",
+    "en": "love"
+  },
+  "live.v.01": {
+    "vi": "sống",
+    "zh": "生活",
+    "en": "live"
+  }
+}

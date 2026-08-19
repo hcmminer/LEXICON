@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="page">
+  <div>
+    <p class="kicker">Control plane</p>
+    <h1>Jobs</h1>
+    <p class="lede">Run long LLM pipelines (gloss generation) in the background with live progress and logs.</p>
+  </div>
+  <p class="pill {% if any_running %}live{% endif %}">
+    {% if any_running %}running{% else %}idle{% endif %}
+  </p>
+</header>
+
+<section class="card">
+  <h2>Start a job</h2>
+  <div class="row-form">
+    {% for kind, (label, _) in kinds.items() %}
+    <form method="post" action="/jobs/start">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <button type="submit" {% if any_running %}disabled{% endif %}>{{ label }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  <p class="muted">One job at a time. Higher tiers reuse the cache — top 6000 only translates the extra 3000, never redoes finished concepts. English is copied, not translated.</p>
+</section>
+
+<section class="card">
+  <h2>Job history</h2>
+  <div id="jobs-root">
+    <p class="muted">Loading…</p>
+  </div>
+</section>
+
+<script>
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/jobs/api');
+    const data = await res.json();
+    const host = document.getElementById('jobs-root');
+    if (!data.jobs.length) {
+      host.innerHTML = '<p class="muted">No jobs yet.</p>';
+      return;
+    }
+    host.innerHTML = data.jobs.map((j) => {
+      const pct = j.progress.total > 0 ? Math.round((j.progress.done / j.progress.total) * 100) : 0;
+      const status = j.status;
+      const cls = status === 'done' ? 'ok' : (status === 'error' || status === 'cancelled' ? 'err' : '');
+      const bar = status === 'running' || status === 'queued' || status === 'cancelling'
+        ? `<div class="bar"><span style="width: ${pct}%"></span></div><p class="muted">${j.progress.done}/${j.progress.total} (${pct}%)</p>`
+        : '';
+      const log = (j.log || []).slice(-12).map(esc).join('<br>');
+      return `<div class="job ${cls}">
+        <div class="job-head">
+          <span class="job-name">${esc(j.name)}</span>
+          <span class="pill ${status === 'running' ? 'live' : ''}">${esc(status)}</span>
+          <span class="muted">${esc(j.started_at || '')}</span>
+          ${(status === 'running' || status === 'queued') ? `<form method="post" action="/jobs/${esc(j.id)}/cancel"><button type="submit">Cancel</button></form>` : ''}
+        </div>
+        ${bar}
+        ${log ? `<pre class="log">${log}</pre>` : ''}
+        ${j.error ? `<p class="error">${esc(j.error)}</p>` : ''}
+      </div>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('jobs-root').innerHTML = '<p class="error">' + esc(err.message) + '</p>';
+  }
+}
+
+setInterval(refresh, 2500);
+refresh();
+</script>
+
+<style>
+.job { border: 1px solid var(--border, rgba(128,128,128,.3)); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.job.ok { border-color: rgba(34,197,94,.5); }
+.job.err { border-color: rgba(239,68,68,.5); }
+.job-head { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+.job-name { font-weight: 600; }
+.row-form form { display: inline-block; margin-right: 8px; }
+</style>
+{% endblock %}

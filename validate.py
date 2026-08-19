@@ -26,12 +26,15 @@ def _require(cond: bool, message: str) -> None:
 
 def _validate_term(lang: str, term: Any, concept_id: str) -> int:
     prefix = f"{concept_id}.{lang}"
-    _require(isinstance(term, dict), f"{prefix} must be an object {{text, rank, readings?}}")
+    _require(isinstance(term, dict), f"{prefix} must be an object {{text, rank, meaning?, readings?}}")
     text = term.get("text")
     _require(isinstance(text, str) and text.strip() != "", f"{prefix}.text must be a non-empty string")
     _require(text == text.strip(), f"{prefix}.text has surrounding whitespace")
     rank = term.get("rank")
     _require(isinstance(rank, int) and rank >= 1, f"{prefix}.rank must be an integer >= 1")
+    if "meaning" in term:
+        meaning = term["meaning"]
+        _require(isinstance(meaning, str) and meaning.strip() != "", f"{prefix}.meaning must be a non-empty string")
     if "readings" in term:
         readings = term["readings"]
         _require(isinstance(readings, dict), f"{prefix}.readings must be an object")

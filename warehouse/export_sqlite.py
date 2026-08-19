@@ -20,6 +20,7 @@ CREATE TABLE terms (
   concept_id TEXT NOT NULL REFERENCES concepts(id),
   lang TEXT NOT NULL,
   text TEXT NOT NULL,
+  meaning TEXT,
   rank INTEGER NOT NULL,
   readings TEXT,
   PRIMARY KEY (concept_id, lang)

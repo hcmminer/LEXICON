@@ -78,10 +78,22 @@ CREATE TABLE IF NOT EXISTS core.ingest_runs (
     notes TEXT
 );
 
+-- Native localized glosses harvested from per-language Wiktionary dumps.
+-- Each row: a concept synset, a language, and that language's own definition.
+CREATE TABLE IF NOT EXISTS core.synset_glosses (
+    synset_id TEXT NOT NULL REFERENCES core.synsets (id) ON DELETE CASCADE,
+    lang TEXT NOT NULL REFERENCES core.languages (code),
+    gloss TEXT NOT NULL,
+    source_id TEXT NOT NULL REFERENCES core.sources (id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (synset_id, lang)
+);
+
 INSERT INTO core.sources (id, name, version, license) VALUES
     ('wordfreq', 'wordfreq', '3.1', 'MIT'),
     ('omw-1.4', 'Open Multilingual Wordnet', '1.4', 'various'),
     ('wordnet', 'Princeton WordNet', '3.1', 'Princeton WordNet License'),
     ('wiktextract', 'Kaikki / wiktextract English dump', 'kaikki', 'CC BY-SA'),
+    ('wiktextract-multilingual', 'Kaikki per-language Wiktionary dumps', 'kaikki', 'CC BY-SA'),
     ('readings', 'Generated readings (pypinyin/kakasi/ipa)', '1', 'generated')
 ON CONFLICT (id) DO NOTHING;

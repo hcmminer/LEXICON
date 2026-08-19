@@ -11,12 +11,21 @@ from fastapi.templating import Jinja2Templates
 from phonology import LANGUAGE_PHONOLOGY, phonology_dto
 from schema import LANGUAGES, WORDNET_POS_TO_OURS
 from warehouse.export_json import build_catalog, export_json
+from warehouse.curate_tier1 import apply_proposals, ambiguous_synsets, run_curation_batch
 from warehouse.ingest.readings import ingest_readings
 from warehouse.ingest.seed import seed_reference_data
 from warehouse.ingest.wiktionary import ingest_wiktionary
 from warehouse.ingest.wordfreq import ingest_wordfreq
 from warehouse.ingest.wordnet_omw import ingest_omw, ingest_wordnet
-from warehouse.jobs import snapshot, start
+from warehouse.jobs import (
+    cancel_job,
+    is_any_running,
+    list_jobs,
+    run_job,
+    snapshot,
+    start,
+)
+from warehouse.llm import llm_config, save_llm_config
 from warehouse.queries import get_concept, search_catalog, warehouse_stats
 from warehouse.rank import compute_ranks
 
@@ -29,6 +38,8 @@ NAV = (
     ("/", "Coverage"),
     ("/catalog", "Catalog"),
     ("/export", "Export"),
+    ("/curate", "Curation"),
+    ("/jobs", "Jobs"),
     ("/ops", "Operations"),
 )
 
@@ -204,6 +215,151 @@ def ops_run(name: str = Form(...)):
     if error:
         raise HTTPException(409, error)
     return RedirectResponse("/ops", status_code=303)
+
+
+# ── LLM curation tab ──────────────────────────────────────────────────────────
+
+
+def _mask_key(key: str) -> str:
+    if not key:
+        return ""
+    return f"{key[:6]}…{key[-4:]}" if len(key) > 12 else "…"
+
+
+@app.get("/curate", response_class=HTMLResponse)
+def curate(request: Request):
+    cfg = llm_config()
+    return templates.TemplateResponse(
+        request,
+        "curate.html",
+        _ctx(
+            request,
+            title="Curation",
+            configured=cfg is not None,
+            base_url=cfg["base_url"] if cfg else "",
+            masked_key=_mask_key(cfg["api_key"]) if cfg else "",
+            model=cfg["model"] if cfg else "",
+        ),
+    )
+
+
+@app.post("/curate/settings")
+def curate_settings(
+    base_url: str = Form(...),
+    api_key: str = Form(...),
+    model: str = Form(...),
+):
+    if not base_url.strip() or not api_key.strip() or not model.strip():
+        raise HTTPException(400, "base URL, API key and model are all required")
+    save_llm_config(base_url, api_key, model)
+    return RedirectResponse("/curate", status_code=303)
+
+
+@app.post("/curate/scan")
+def curate_scan(
+    lang: str = Form("vi"),
+    limit: int = Form(20),
+):
+    lang = lang if lang in LANGUAGES else "vi"
+    limit = min(max(int(limit), 1), 200)
+    rows = ambiguous_synsets(lang, limit)
+    return {"count": len(rows), "rows": rows}
+
+
+@app.post("/curate/run")
+def curate_run(payload: dict = None):
+    if payload is None:
+        payload = {}
+    items = payload.get("items") or []
+    langs = payload.get("langs") or ["vi", "zh", "en"]
+    if not items:
+        raise HTTPException(400, "no synsets selected")
+    if llm_config() is None:
+        raise HTTPException(400, "LLM is not configured — add API settings first")
+    try:
+        proposals = run_curation_batch(list(items)[:40], list(langs))
+    except Exception as exc:  # noqa: BLE001 - surface LLM errors to the form
+        raise HTTPException(502, str(exc)) from exc
+    return {"count": len(proposals), "proposals": proposals}
+
+
+@app.post("/curate/apply")
+def curate_apply(payload: dict = None):
+    if payload is None:
+        payload = {}
+    proposals = payload.get("proposals") or []
+    if not proposals:
+        raise HTTPException(400, "no proposals to apply")
+    applied = apply_proposals(proposals)
+    return {"applied": applied}
+
+
+@app.post("/curate/export")
+def curate_export():
+    """Re-export union + zh-3000 from Postgres (with overrides applied)."""
+    export_json(top_n=12000)
+    export_json(top_n=3000, pivot="zh")
+    return {"ok": True, "msg": "Re-exported out/core_vocabulary.json and out/core_vocabulary.zh-3000.json"}
+
+
+# ── Jobs (Big-Tech job queue UI) ──────────────────────────────────────────────
+
+
+def _gloss_job_fn(top_n: int):
+    from warehouse.generate_all_glosses import DEFAULT_WORKERS, run as run_glosses
+
+    def fn(ctx) -> None:  # ctx is warehouse.jobs.JobContext
+        run_glosses(
+            top_n,
+            limit=None,
+            langs=None,
+            workers=DEFAULT_WORKERS,
+            log=ctx.log,
+            progress=lambda done, total: ctx.progress(done, total),
+            cancelled=ctx.cancelled,
+        )
+
+    return fn
+
+
+JOB_KINDS = {
+    "gloss-3000": ("Glosses top 3000", lambda: _gloss_job_fn(3000)),
+    "gloss-6000": ("Glosses top 6000", lambda: _gloss_job_fn(6000)),
+    "gloss-9000": ("Glosses top 9000", lambda: _gloss_job_fn(9000)),
+    "gloss-12000": ("Glosses top 12000", lambda: _gloss_job_fn(12000)),
+}
+
+
+@app.get("/jobs", response_class=HTMLResponse)
+def jobs_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "jobs.html",
+        _ctx(request, title="Jobs", jobs=list_jobs(20), any_running=is_any_running(), kinds=JOB_KINDS),
+    )
+
+
+@app.get("/jobs/api")
+def jobs_api():
+    return {"jobs": list_jobs(20), "any_running": is_any_running()}
+
+
+@app.post("/jobs/start")
+def jobs_start(kind: str = Form(...)):
+    if kind not in JOB_KINDS:
+        raise HTTPException(400, f"Unknown job kind: {kind}")
+    if is_any_running():
+        raise HTTPException(409, "A job is already running.")
+    label, factory = JOB_KINDS[kind]
+    run_job(label, factory())
+    return RedirectResponse("/jobs", status_code=303)
+
+
+@app.post("/jobs/{job_id}/cancel")
+def jobs_cancel(job_id: str):
+    if not cancel_job(job_id):
+        raise HTTPException(404, "Job not found or already finished")
+    return RedirectResponse("/jobs", status_code=303)
 
 
 def run(host: str = "127.0.0.1", port: int = 8787) -> None:
