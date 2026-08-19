@@ -6,6 +6,7 @@ from warehouse.ingest.llm_gaps import (
     load_gap_cache,
     may_write_llm,
     missing_rank_slots,
+    propose_lemma,
     save_gap_cache,
 )
 
@@ -30,3 +31,44 @@ def test_accept_and_backtranslate_and_gold_lock(tmp_path: Path):
     path = tmp_path / "gaps.json"
     save_gap_cache(path, {"water.n.01\tvi": "nước"})
     assert load_gap_cache(path)["water.n.01\tvi"] == "nước"
+
+
+def test_propose_lemma_accepts_valid_roundtrip():
+    def fake_call(system, user, **kwargs):
+        assert "water.n.01" in user
+        return {"lemma": "nước", "back_en": "water"}
+
+    assert (
+        propose_lemma(
+            "water.n.01",
+            "noun",
+            "a liquid",
+            ["water"],
+            "vi",
+            [],
+            call_json=fake_call,
+        )
+        == "nước"
+    )
+
+
+def test_propose_lemma_rejects_bad_backtranslate_then_none_on_second_fail():
+    calls = {"n": 0}
+
+    def fake_call(system, user, **kwargs):
+        calls["n"] += 1
+        return {"lemma": "nước", "back_en": "chair"}
+
+    assert (
+        propose_lemma(
+            "water.n.01",
+            "noun",
+            "a liquid",
+            ["water"],
+            "vi",
+            [],
+            call_json=fake_call,
+        )
+        is None
+    )
+    assert calls["n"] == 2
