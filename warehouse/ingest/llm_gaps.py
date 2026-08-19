@@ -199,7 +199,12 @@ def ingest_llm_gaps(limit: int | None = None, job: Any | None = None, top_n: int
                 SELECT sl.synset_id, l.lang, sl.source_id
                 FROM core.sense_lemmas sl
                 JOIN core.lemmas l ON l.id = sl.lemma_id
-                """
+                WHERE sl.synset_id IN (
+                    SELECT synset_id FROM core.concept_ranks
+                    WHERE lang = 'en' AND rank <= %s
+                )
+                """,
+                (top_n,),
             )
         }
         meta = {
@@ -258,6 +263,7 @@ def ingest_llm_gaps(limit: int | None = None, job: Any | None = None, top_n: int
             pending_links.clear()
             conn.commit()
 
+        print(f"llm-gaps synsets={total} cached={sum(1 for s in synsets for lang in by_synset[s] if gap_cache_key(s, lang) in cache)}")
         for index, synset_id in enumerate(synsets, start=1):
             if job is not None:
                 if job.cancelled():
@@ -275,6 +281,8 @@ def ingest_llm_gaps(limit: int | None = None, job: Any | None = None, top_n: int
                 else:
                     still.append(lang)
             if still:
+                if index % 10 == 0 or index == 1:
+                    print(f"  llm-gaps {index}/{total} wrote={written} langs={len(still)}")
                 pos, definition = meta.get(synset_id, ("other", ""))
                 proposed = propose_lemmas_for_synset(
                     synset_id,
