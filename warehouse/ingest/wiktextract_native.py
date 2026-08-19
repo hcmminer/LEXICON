@@ -22,8 +22,19 @@ def _english_words(entry: dict) -> list[str]:
     if isinstance(entry.get("translations"), list):
         buckets.append(entry["translations"])
     for sense in entry.get("senses") or []:
-        if isinstance(sense, dict) and isinstance(sense.get("translations"), list):
+        if not isinstance(sense, dict):
+            continue
+        if isinstance(sense.get("translations"), list):
             buckets.append(sense["translations"])
+        for link in sense.get("links") or []:
+            if not isinstance(link, (list, tuple)) or len(link) < 2:
+                continue
+            target = str(link[1]).strip()
+            if not target or "#" in target:
+                continue
+            word = target.replace("_", " ").strip()
+            if word and any(ch.isalpha() and ord(ch) < 0x300 for ch in word):
+                found.append(word)
     for group in buckets:
         for item in group:
             if not isinstance(item, dict):

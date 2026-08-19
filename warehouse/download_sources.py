@@ -7,6 +7,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from urllib.parse import quote
+
 from warehouse.config import CACHE
 from warehouse.ingest.kaikki_langs import KAIKKI_NATIVE_LANGS
 
@@ -55,7 +57,9 @@ for _iso, _name in KAIKKI_NATIVE_LANGS.items():
     _fname = f"kaikki.org-dictionary-{_name.replace(' ', '_')}.jsonl.gz"
     DATA_SOURCES[f"kaikki-{_iso}"] = {
         "filename": _fname,
-        "urls": [f"https://kaikki.org/dictionary/{_name}/kaikki.org-dictionary-{_name}.jsonl.gz"],
+        "urls": [
+            f"https://kaikki.org/dictionary/{quote(_name)}/kaikki.org-dictionary-{quote(_name)}.jsonl.gz"
+        ],
         "dest_subdir": "kaikki-native",
         "extract": False,
         "check_path": f"kaikki-native/{_fname}",
