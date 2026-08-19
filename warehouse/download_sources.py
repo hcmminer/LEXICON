@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 
 from warehouse.config import CACHE
+from warehouse.ingest.kaikki_langs import KAIKKI_NATIVE_LANGS
 
 DATA_SOURCES = {
     "wordnet": {
@@ -40,6 +41,16 @@ DATA_SOURCES = {
         "check_path": "kaikki.org-dictionary-English.jsonl.gz",
     },
 }
+
+for _iso, _name in KAIKKI_NATIVE_LANGS.items():
+    _fname = f"kaikki.org-dictionary-{_name.replace(' ', '_')}.jsonl.gz"
+    DATA_SOURCES[f"kaikki-{_iso}"] = {
+        "filename": _fname,
+        "urls": [f"https://kaikki.org/dictionary/{_name}/kaikki.org-dictionary-{_name}.jsonl.gz"],
+        "dest_subdir": "kaikki-native",
+        "extract": False,
+        "check_path": f"kaikki-native/{_fname}",
+    }
 
 
 def log(msg: str) -> None:

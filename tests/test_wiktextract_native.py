@@ -1,4 +1,6 @@
-from warehouse.ingest.wiktextract_native import native_entry_links
+from schema import LANGUAGES
+from warehouse.download_sources import DATA_SOURCES
+from warehouse.ingest.wiktextract_native import KAIKKI_NATIVE_LANGS, native_entry_links
 
 
 def test_native_entry_maps_via_english_translation():
@@ -28,3 +30,12 @@ def test_native_entry_skips_unknown_english_and_bad_script():
     }
     assert native_entry_links(unknown, en_index) == []
     assert native_entry_links(latin_as_vi, en_index) == []
+
+
+def test_every_non_english_language_has_a_kaikki_dump_spec():
+    missing = [lang for lang in LANGUAGES if lang != "en" and lang not in KAIKKI_NATIVE_LANGS]
+    assert missing == []
+    for lang, name in KAIKKI_NATIVE_LANGS.items():
+        key = f"kaikki-{lang}"
+        assert key in DATA_SOURCES
+        assert name.replace(" ", "%20") in DATA_SOURCES[key]["urls"][0] or name in DATA_SOURCES[key]["urls"][0]
