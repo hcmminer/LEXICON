@@ -12,6 +12,7 @@ from schema import LANGUAGES, SCHEMA_VERSION, SOURCES, WORDNET_POS_TO_OURS, empt
 from warehouse.config import OUT_DIR
 from warehouse.db import connect
 from warehouse.gloss_generator import load_gloss_cache
+from validate import validate_document, write_coverage
 
 
 def _term_from_row(row: dict[str, Any]) -> dict[str, Any]:
