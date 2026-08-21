@@ -26,6 +26,10 @@ scored AS (
         (
             COALESCE(l.zipf, 0.0)
             + CASE
+                WHEN sl.synset_id LIKE l.normalized || '.%%' THEN 1.0
+                ELSE 0.0
+              END
+            + CASE
                 WHEN l.lang = 'vi' AND POSITION(' ' IN l.text) > 0 THEN 0.6
                 WHEN l.lang IN ('zh', 'ja', 'ko') AND char_length(btrim(l.text)) >= 2 THEN 0.5
                 ELSE 0.0
@@ -53,7 +57,8 @@ preferred AS (
         s.lemma_id,
         s.zipf,
         s.wordfreq_rank,
-        s.synset_count
+        s.synset_count,
+        s.selection_score
     FROM scored s
     ORDER BY s.synset_id, s.lang, s.selection_score DESC, s.synset_count ASC, s.lemma_id
 ),
@@ -76,7 +81,11 @@ SELECT
     p.lang,
     ROW_NUMBER() OVER (
         PARTITION BY p.lang
-        ORDER BY p.zipf DESC NULLS LAST, p.synset_id
+        ORDER BY
+            COALESCE(p.wordfreq_rank, 999999) ASC,
+            p.selection_score DESC,
+            p.zipf DESC NULLS LAST,
+            p.synset_id
     ) AS rank,
     p.lemma_id
 FROM preferred p

@@ -128,8 +128,31 @@ def build_pedagogical_catalog(top_n: int = 6000, pivot: str | None = None) -> di
 
         concept["terms"] = terms
         cleaned_concepts.append(concept)
-        if len(cleaned_concepts) >= top_n:
-            break
+
+    # Group concepts by English headword to deduplicate and pick canonical senses
+    by_en_word: dict[str, list[dict[str, Any]]] = {}
+    for c in cleaned_concepts:
+        en_text = (c.get("terms", {}).get("en", {}).get("text") or "").strip().lower()
+        if en_text:
+            by_en_word.setdefault(en_text, []).append(c)
+
+    # For each English word, sort its candidate synsets by verified curation status, then rank
+    deduped_concepts: list[dict[str, Any]] = []
+    for en_text, synsets in by_en_word.items():
+        synsets.sort(key=lambda c: (
+            0 if c.get("id", "") in overrides else 1,
+            int(c.get("terms", {}).get("en", {}).get("rank", 999999)),
+            c.get("id", "")
+        ))
+        deduped_concepts.extend(synsets[:3])
+
+    # Sort all deduplicated concepts by their best English rank and slice top_n
+    deduped_concepts.sort(key=lambda c: (
+        0 if c.get("id", "") in overrides else 1,
+        int(c.get("terms", {}).get("en", {}).get("rank", 999999)),
+        c.get("id", "")
+    ))
+    cleaned_concepts = deduped_concepts[:top_n]
 
     # Re-rank ranks continuously 1..N per language in union or pivot
     by_lang: dict[str, list[dict[str, Any]]] = {}

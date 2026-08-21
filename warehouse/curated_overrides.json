@@ -33366,7 +33366,8 @@
     "ur": "درست",
     "ta": "சரியான",
     "te": "సరైన",
-    "sw": "sahihi"
+    "sw": "sahihi",
+    "en": "right"
   },
   "right.a.07": {
     "vi": "hữu phái",
@@ -33510,7 +33511,8 @@
     "ur": "دایاں بازو",
     "ta": "வலதுசாரி",
     "te": "కుడి పక్షం",
-    "sw": "mrengo wa kulia"
+    "sw": "mrengo wa kulia",
+    "en": "right wing"
   },
   "right.n.06": {
     "vi": "rẽ phải",
@@ -114841,7 +114843,21 @@
     "en": "sir"
   },
   "impossible.a.01": {
-    "vi": "bất khả thi",
+    "vi": "không thể",
     "en": "impossible"
+  },
+  "chief.s.01": {
+    "en": "main",
+    "vi": "chính"
+  },
+  "main.s.02": {
+    "en": "main",
+    "vi": "chính"
+  },
+  "main.n.01": {
+    "vi": "đại dương"
+  },
+  "main.n.02": {
+    "vi": "đường ống chính"
   }
 }

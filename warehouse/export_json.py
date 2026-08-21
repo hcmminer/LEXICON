@@ -13,6 +13,7 @@ from warehouse.config import OUT_DIR
 from warehouse.db import connect
 from warehouse.gloss_generator import load_gloss_cache
 from warehouse.textutil import is_function_word, is_usable_lemma, lemma_text
+import wordfreq
 from validate import validate_document, write_coverage
 
 
@@ -155,7 +156,14 @@ def build_catalog(
             for lang, term in concept["terms"].items():
                 by_lang[lang].append(term)
         for lang, terms in by_lang.items():
-            terms.sort(key=lambda term: (term.get("rank", 99999), term["text"]))
+            if lang == "en":
+                terms.sort(key=lambda term: (
+                    -wordfreq.zipf_frequency(term["text"], "en") if wordfreq.zipf_frequency(term["text"], "en") > 0 else 99999,
+                    term.get("rank", 99999),
+                    term["text"]
+                ))
+            else:
+                terms.sort(key=lambda term: (term.get("rank", 99999), term["text"]))
             for rank, term in enumerate(terms, start=1):
                 term["rank"] = rank
         concepts.sort(key=lambda item: (item["terms"]["en"]["rank"], item["id"]))
