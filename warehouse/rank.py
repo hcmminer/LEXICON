@@ -23,3 +23,4 @@ def compute_ranks(top_n: int) -> None:
     print(f"ranked catalog synsets={total['n']} topN={top_n}")
     for row in stats:
         print(f"  {row['lang']:4} {row['n']}")
+

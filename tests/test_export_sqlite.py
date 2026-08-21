@@ -48,6 +48,37 @@ def test_write_catalog_sqlite_slices_by_rank(tmp_path: Path) -> None:
     conn.close()
 
 
+def test_write_catalog_sqlite_persists_term_meaning(tmp_path: Path) -> None:
+    dest = tmp_path / "lexicon-core-meaning.db"
+    write_catalog_sqlite(
+        {
+            "version": 1,
+            "count": 1,
+            "topN": 1,
+            "languages": ["en", "vi"],
+            "concepts": [
+                {
+                    "id": "valley.n.01",
+                    "pos": "noun",
+                    "meaning": "a long depression in the surface of the land",
+                    "terms": {
+                        "en": {"text": "valley", "rank": 1, "meaning": "a long depression in the land"},
+                        "vi": {"text": "thung lũng", "rank": 1, "meaning": "vùng đất trũng thường có sông"},
+                    },
+                }
+            ],
+        },
+        dest,
+    )
+    conn = sqlite3.connect(dest)
+    rows = dict(
+        conn.execute("SELECT lang, meaning FROM terms WHERE concept_id = ?", ("valley.n.01",))
+    )
+    conn.close()
+    assert rows["vi"] == "vùng đất trũng thường có sông"
+    assert rows["en"] == "a long depression in the land"
+
+
 def test_schema_has_rank_index() -> None:
     dest = Path("/tmp/lexicon-core-schema-test.db")
     if dest.exists():

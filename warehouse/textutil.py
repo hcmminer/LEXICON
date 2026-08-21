@@ -5,6 +5,8 @@ import re
 from schema import FUNCTION_WORDS, FUNCTION_WORDS_BY_LANG, SHORT_KEEP, WORDFREQ_LANG
 
 LEMMA_RE = re.compile(r"^[^\W\d_][^\W\d_'-]*$", re.UNICODE)
+ABBREV_RE = re.compile(r"\.")
+FULLWIDTH_ALNUM_RE = re.compile(r"[\uff10-\uff19\uff21-\uff3a\uff41-\uff5a]")
 
 
 def freq_lang(lang: str) -> str:
@@ -19,8 +21,22 @@ def normalize(text: str) -> str:
     return clean_lemma(text).casefold()
 
 
+def is_affix_lemma(text: str) -> bool:
+    stripped = text.strip()
+    return bool(stripped) and (stripped.startswith("-") or stripped.endswith("-"))
+
+
 def is_usable_lemma(text: str) -> bool:
-    return bool(text) and len(text) <= 40 and not any(ch.isdigit() for ch in text)
+    stripped = (text or "").strip()
+    if not stripped or len(stripped) > 40:
+        return False
+    if any(ch.isdigit() for ch in stripped) or FULLWIDTH_ALNUM_RE.search(stripped):
+        return False
+    if ABBREV_RE.search(stripped):
+        return False
+    if is_affix_lemma(stripped):
+        return False
+    return True
 
 
 def _has_range(text: str, start: int, end: int) -> bool:
@@ -56,7 +72,18 @@ def script_ok(lang: str, text: str) -> bool:
 
 
 def is_function_word(lang: str, word: str) -> bool:
-    folded = word.casefold()
+    folded = word.casefold().strip()
+    if not folded:
+        return True
+
+    # Check multi-word phrase composed mostly of function words
+    tokens = folded.split()
+    if len(tokens) >= 2:
+        func_set = FUNCTION_WORDS if lang == "en" else FUNCTION_WORDS_BY_LANG.get(lang, frozenset())
+        func_count = sum(1 for tok in tokens if tok in func_set)
+        if func_count == len(tokens) or (len(tokens) == 2 and tokens[0] == tokens[1]):
+            return True
+
     if lang == "en":
         if folded in FUNCTION_WORDS:
             return True

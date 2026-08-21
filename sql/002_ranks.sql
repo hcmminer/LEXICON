@@ -1,36 +1,61 @@
 -- Rank per-language headwords for the core vocabulary catalog.
 --
 -- Selection order per (synset, lang):
---   1. Specificity: prefer the lemma that is a translation of the FEWEST
---      synsets overall (a lemma mapped to 1 synset is a high-confidence
---      translation; a lemma mapped to 15 synsets is a frequent-but-vague
---      word like "keep" and makes a poor headword for any single sense).
---   2. Frequency: within equally specific candidates, pick the more common
---      lemma (higher zipf).
---   3. Deterministic tie-break by lemma id.
--- Function words are excluded entirely (covers particles/pronouns/etc. that
--- would otherwise top the frequency list for every synset they touch).
+--   1. Specificity & Quality Score:
+--      - Prefer lemmas with higher Zipf score (populated dynamically for multi-word compounds).
+--      - Apply compound bonus for isolating languages (e.g. Vietnamese multi-syllable words)
+--        to prevent bound single syllables ('trình', 'phố', 'tiết') from beating full words
+--        ('chương trình', 'thành phố', 'thời tiết').
+--      - Penalize hyper-polysemous lemmas (high synset count).
+--   2. Deterministic tie-break by lemma id.
+-- Function words are excluded entirely.
 
 WITH lemma_span AS (
     SELECT lemma_id, COUNT(DISTINCT synset_id)::int AS synset_count
     FROM core.sense_lemmas
     GROUP BY lemma_id
 ),
-preferred AS (
-    SELECT DISTINCT ON (sl.synset_id, l.lang)
+scored AS (
+    SELECT
         sl.synset_id,
         l.lang,
         l.id AS lemma_id,
         l.zipf,
         l.wordfreq_rank,
-        ls.synset_count
+        ls.synset_count,
+        (
+            COALESCE(l.zipf, 0.0)
+            + CASE
+                WHEN l.lang = 'vi' AND POSITION(' ' IN l.text) > 0 THEN 0.6
+                WHEN l.lang IN ('zh', 'ja', 'ko') AND char_length(btrim(l.text)) >= 2 THEN 0.5
+                ELSE 0.0
+              END
+            - CASE
+                WHEN l.lang IN ('zh', 'ja') AND char_length(btrim(l.text)) = 1 THEN 0.8
+                ELSE 0.0
+              END
+            - (ls.synset_count * 0.02)
+        ) AS selection_score
     FROM core.sense_lemmas sl
     JOIN core.lemmas l ON l.id = sl.lemma_id
     JOIN lemma_span ls ON ls.lemma_id = l.id
     LEFT JOIN core.function_words fw
         ON fw.lang = l.lang AND fw.normalized = l.normalized
     WHERE fw.normalized IS NULL
-    ORDER BY sl.synset_id, l.lang, ls.synset_count ASC, l.zipf DESC NULLS LAST, l.id
+      AND l.text NOT LIKE '-%%'
+      AND l.text NOT LIKE '%%-'
+      AND POSITION('.' IN l.text) = 0
+),
+preferred AS (
+    SELECT DISTINCT ON (s.synset_id, s.lang)
+        s.synset_id,
+        s.lang,
+        s.lemma_id,
+        s.zipf,
+        s.wordfreq_rank,
+        s.synset_count
+    FROM scored s
+    ORDER BY s.synset_id, s.lang, s.selection_score DESC, s.synset_count ASC, s.lemma_id
 ),
 seeded AS (
     SELECT DISTINCT synset_id
@@ -56,3 +81,4 @@ SELECT
     p.lemma_id
 FROM preferred p
 JOIN catalog c ON c.synset_id = p.synset_id;
+

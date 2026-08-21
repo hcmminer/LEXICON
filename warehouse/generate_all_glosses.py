@@ -125,6 +125,7 @@ def run(
     log: Callable[[str], None] | None = None,
     progress: Callable[[int, int], None] | None = None,
     cancelled: Callable[[], bool] | None = None,
+    slot_budget: int = SLOT_BUDGET,
 ) -> int:
     def _log(line: str) -> None:
         print(line, flush=True)
@@ -141,11 +142,11 @@ def run(
     pending = collect_pending(catalog, langs, cache)
     skipped = len(catalog["concepts"]) - len(pending)
     total = len(pending)
-    batches = pack_by_slots(pending)
+    batches = pack_by_slots(pending, slot_budget=slot_budget)
     _log(
         f"reuse {skipped} complete, {en_filled} en-copied, "
         f"{total} pending → {len(batches)} requests "
-        f"(slot budget {SLOT_BUDGET}, workers {workers})"
+        f"(slot budget {slot_budget}, workers {workers})"
     )
     if progress:
         progress(0, total)
@@ -184,8 +185,7 @@ def run(
             tmp.replace(GLOSS_CACHE_FILE)
             if progress:
                 progress(done, total)
-            if done % 100 == 0 or done == total:
-                _log(f"progress {done}/{total} concepts glossed")
+            _log(f"progress {done}/{total} concepts glossed")
             if limit is not None and done >= limit:
                 break
 
@@ -200,9 +200,10 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--langs", type=str, default=None)
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
+    parser.add_argument("--slot-budget", type=int, default=SLOT_BUDGET)
     args = parser.parse_args()
     langs = [lang.strip() for lang in args.langs.split(",") if lang.strip()] if args.langs else None
-    return run(args.top, args.limit, langs, workers=args.workers)
+    return run(args.top, args.limit, langs, workers=args.workers, slot_budget=args.slot_budget)
 
 
 if __name__ == "__main__":

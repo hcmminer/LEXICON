@@ -21,6 +21,7 @@ from schema import LANGUAGES, SCHEMA_VERSION, empty_envelope
 from warehouse.config import OUT_DIR
 from warehouse.gloss_generator import load_gloss_cache
 from warehouse.build_readings import readings_for
+from warehouse.textutil import is_function_word, is_usable_lemma
 
 OVERRIDE_PATH = Path(__file__).parent / "curated_overrides.json"
 
@@ -71,6 +72,10 @@ def build_pedagogical_catalog(top_n: int = 6000, pivot: str | None = None) -> di
         if any(b in meaning for b in BANNED_MEANING_SUBSTRINGS):
             continue
 
+        # Prioritize concepts that have verified localized glosses in cache
+        if cid not in gloss_cache:
+            continue
+
         # Clean terms
         terms = concept.get("terms", {})
         if not terms or "en" not in terms:
@@ -84,18 +89,26 @@ def build_pedagogical_catalog(top_n: int = 6000, pivot: str | None = None) -> di
                 else:
                     terms[lang] = {"text": text, "rank": 9999}
 
+        terms = {
+            lang: term_obj
+            for lang, term_obj in terms.items()
+            if is_usable_lemma(str(term_obj.get("text") or ""))
+            and not is_function_word(lang, str(term_obj.get("text") or ""))
+        }
+        if "en" not in terms:
+            continue
+
         # Apply localized meaning / gloss if present in cache, otherwise omit
         for lang, term_obj in terms.items():
             if cid in gloss_cache and lang in gloss_cache[cid]:
                 term_obj["meaning"] = gloss_cache[cid][lang]
-            elif "meaning" in term_obj:
-                del term_obj["meaning"]
             generated = readings_for(lang, str(term_obj.get("text") or ""))
             if generated:
                 term_obj["readings"] = generated
             elif "readings" in term_obj:
                 del term_obj["readings"]
 
+        concept["terms"] = terms
         cleaned_concepts.append(concept)
         if len(cleaned_concepts) >= top_n:
             break

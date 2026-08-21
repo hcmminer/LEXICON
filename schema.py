@@ -144,11 +144,11 @@ FUNCTION_WORDS_BY_LANG = {
         này đó kia ấy đã sẽ đang chưa không chẳng rất quá cũng vẫn
         hãy nhé thôi với về trong ngoài trên dưới một tôi mình bạn
         ta chúng người cái sự việc ở tại bằng như còn lại
-        cứ loạt
+        cứ loạt có cho
         """.split()
     ),
     "zh": frozenset("的 了 在 是 我 有 和 就 不 人 都 一 一个 上 也 很 到 说 要 去 你 会 着 没有 看 好 自己 这".split()),
-    "de": frozenset("der die das den dem des ein eine einer eines und oder aber wenn weil mit von zu im am".split()),
+    "de": frozenset("der die das den dem des ein eine einer eines und oder aber wenn weil mit von zu im am was es nicht ich".split()),
     "ko": frozenset("이 그 저 것 수 등 때 및 또 또는 그리고 그러나 그래서 이다 있다 없다 하다".split()),
 }
 

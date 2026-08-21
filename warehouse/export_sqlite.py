@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from warehouse.config import OUT_DIR
+from warehouse.textutil import is_usable_lemma
 
 CORE_SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -50,25 +51,27 @@ def write_catalog_sqlite(catalog: dict[str, Any], dest: Path) -> Path:
             for concept in catalog.get("concepts", [])
         ]
         conn.executemany("INSERT INTO concepts(id, pos, meaning, meaning_lang) VALUES(?,?,?,?)", concepts)
-        terms: list[tuple[str, str, str, int, str | None]] = []
+        terms: list[tuple[str, str, str, str | None, int, str | None]] = []
         for concept in catalog.get("concepts", []):
             for lang, term in (concept.get("terms") or {}).items():
                 text = str(term.get("text") or "").strip()
                 rank = int(term.get("rank") or 0)
-                if not text or rank < 1:
+                if not text or rank < 1 or not is_usable_lemma(text):
                     continue
                 readings = term.get("readings")
+                meaning = str(term.get("meaning") or "").strip() or None
                 terms.append(
                     (
                         concept["id"],
                         lang,
                         text,
+                        meaning,
                         rank,
                         json.dumps(readings, ensure_ascii=False) if readings else None,
                     )
                 )
         conn.executemany(
-            "INSERT OR REPLACE INTO terms(concept_id, lang, text, rank, readings) VALUES(?,?,?,?,?)",
+            "INSERT OR REPLACE INTO terms(concept_id, lang, text, meaning, rank, readings) VALUES(?,?,?,?,?,?)",
             terms,
         )
         conn.commit()

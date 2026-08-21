@@ -10,7 +10,7 @@ def test_full_matrix_export_has_every_language():
     concepts = []
     for i in range(3):
         terms = {
-            lang: {"text": f"w{i}-{lang}" if lang != "zh" else "水", "rank": i + 1, "meaning": "m"}
+            lang: {"text": f"woord{lang}{'x' * i}", "rank": i + 1, "meaning": "m"}
             for lang in langs
         }
         terms["zh"]["text"] = "水"

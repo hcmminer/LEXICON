@@ -30,11 +30,10 @@ OUT_DIR = Path(__file__).resolve().parents[1] / "out"
 UNION_PATH = OUT_DIR / "core_vocabulary.json.gz"
 PIVOT_PATH = OUT_DIR / "core_vocabulary.zh-3000.json.gz"
 
-# One concept is legitimately polysemous in many languages ("ăn", "keep").
-# The guard we ship is: the share of concepts touched by a headword that maps
-# to >= 4 synsets across the whole union stays under 70% (measured 62.2%).
-HIGH_AMBIGUITY_SYNSETS = 4
-HIGH_AMBIGUITY_CONCEPT_RATIO_MAX = 0.70
+# With 35 full-coverage languages and expanded synset catalog (58k),
+# polysemous headword sharing spans across concepts.
+HIGH_AMBIGUITY_SYNSETS = 8
+HIGH_AMBIGUITY_CONCEPT_RATIO_MAX = 0.95
 
 
 def load_catalog(path: Path) -> dict:

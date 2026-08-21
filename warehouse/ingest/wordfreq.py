@@ -48,6 +48,31 @@ def ingest_wordfreq(limit_per_lang: int | None = None) -> None:
             conn.commit()
             total += len(batch)
             print(f"  wordfreq {lang}: {len(batch)}")
+
+        print("Populating zipf frequencies for compound lemmas across all languages...")
+        for lang in LANGUAGES:
+            rows = conn.execute(
+                "SELECT id, text FROM core.lemmas WHERE lang = %s AND zipf IS NULL", (lang,)
+            ).fetchall()
+            if not rows:
+                continue
+            update_batch = []
+            for r in rows:
+                try:
+                    score = zipf_frequency(r["text"], freq_lang(lang))
+                    if score > 0:
+                        update_batch.append((score, r["id"]))
+                except Exception:
+                    pass
+            if update_batch:
+                executemany(
+                    conn,
+                    "UPDATE core.lemmas SET zipf = %s WHERE id = %s",
+                    update_batch,
+                )
+                conn.commit()
+                print(f"  compound zipf {lang}: updated {len(update_batch):,} / {len(rows):,} lemmas")
+
         conn.execute(
             """
             INSERT INTO core.ingest_runs (source_id, finished_at, row_count)
