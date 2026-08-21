@@ -99,11 +99,13 @@ def build_pedagogical_catalog(top_n: int = 6000, pivot: str | None = None) -> di
 
         # Apply overrides if available
         if cid in overrides:
-            for lang, text in overrides[cid].items():
-                if lang in terms:
-                    terms[lang]["text"] = text
-                else:
-                    terms[lang] = {"text": text, "rank": 9999}
+            for lang, raw_val in overrides[cid].items():
+                clean_text = str(raw_val[0] if isinstance(raw_val, list) and raw_val else raw_val or "").strip()
+                if clean_text:
+                    if lang in terms:
+                        terms[lang]["text"] = clean_text
+                    else:
+                        terms[lang] = {"text": clean_text, "rank": 9999}
 
         terms = {
             lang: term_obj
@@ -135,7 +137,7 @@ def build_pedagogical_catalog(top_n: int = 6000, pivot: str | None = None) -> di
         for lang, term in concept.get("terms", {}).items():
             by_lang.setdefault(lang, []).append(term)
     for lang, terms_list in by_lang.items():
-        terms_list.sort(key=lambda t: (t.get("rank", 99999), t.get("text", "")))
+        terms_list.sort(key=lambda t: (t.get("rank", 99999), str(t.get("text") or "")))
         for r_idx, t in enumerate(terms_list, start=1):
             t["rank"] = r_idx
 
