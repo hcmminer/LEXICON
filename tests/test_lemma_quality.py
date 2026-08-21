@@ -1,4 +1,4 @@
-from warehouse.textutil import is_affix_lemma, is_usable_lemma
+from warehouse.textutil import is_affix_lemma, is_function_word, is_usable_lemma, lemma_text
 
 
 def test_rejects_hyphen_affixes():
@@ -63,3 +63,19 @@ def test_keeps_normal_learner_words():
     assert is_usable_lemma("中国")
     assert is_usable_lemma("Wasser")
     assert is_usable_lemma("lập trình")
+
+
+def test_learner_core_english_is_not_a_function_word():
+    for word in ("can", "could", "must", "should", "will", "would", "may", "even"):
+        assert not is_function_word("en", word), word
+
+
+def test_true_english_function_words_stay_blocked():
+    for word in ("the", "and", "of", "a", "to"):
+        assert is_function_word("en", word), word
+
+
+def test_lemma_text_flattens_llm_list_values():
+    assert lemma_text(["nước"]) == "nước"
+    assert lemma_text("nước") == "nước"
+    assert is_usable_lemma(["nước"]) is True

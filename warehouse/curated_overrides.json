@@ -1616,7 +1616,7 @@
   },
   "see.v.17": {
     "en": "see",
-    "vi": "hiểu",
+    "vi": "nhìn thấu",
     "zh": "理解",
     "ja": "理解する",
     "ko": "알아보다",
@@ -7199,9 +7199,9 @@
     "sw": "vazi la juu"
   },
   "even.r.03": {
-    "en": "yet",
+    "en": "even",
     "vi": "thậm chí",
-    "zh": "更",
+    "zh": "甚至",
     "ja": "さらに",
     "ko": "더욱",
     "hi": "और भी",
@@ -17959,10 +17959,10 @@
     "sw": "wingi"
   },
   "bunch.n.03": {
-    "en": "lot",
-    "vi": "lô",
-    "zh": "整批",
-    "ja": "一式",
+    "en": "bunch",
+    "vi": "mớ",
+    "zh": "一堆",
+    "ja": "ひとまとめ",
     "ko": "묶음",
     "hi": "खेप",
     "es": "lote",
@@ -18254,9 +18254,9 @@
     "sw": "kuzaa matunda"
   },
   "dress.v.16": {
-    "vi": "tạo kiểu",
-    "zh": "梳理",
-    "ja": "結う",
+    "vi": "bày trí",
+    "zh": "布置",
+    "ja": "整える",
     "ko": "정돈하다",
     "hi": "सँवारना",
     "es": "peinar",
@@ -18287,7 +18287,8 @@
     "ur": "سنوارنا",
     "ta": "அலங்கரி",
     "te": "అందగించు",
-    "sw": "pamba"
+    "sw": "pamba",
+    "en": "arrange"
   },
   "jell.v.01": {
     "en": "jell",
@@ -22276,9 +22277,9 @@
     "sw": "jua"
   },
   "know.v.09": {
-    "vi": "hiểu",
-    "zh": "了解",
-    "ja": "知っている",
+    "vi": "biết",
+    "zh": "知道",
+    "ja": "知る",
     "ko": "알다",
     "hi": "जानना",
     "es": "conocer",
@@ -22309,7 +22310,8 @@
     "ur": "جاننا",
     "ta": "அறி",
     "te": "తెలుసుకొను",
-    "sw": "jua"
+    "sw": "jua",
+    "en": "know"
   },
   "know.v.10": {
     "vi": "phân biệt",
@@ -31777,7 +31779,8 @@
     "ur": "درست",
     "ta": "சரியான",
     "te": "సరైన",
-    "sw": "sahihi"
+    "sw": "sahihi",
+    "en": "right"
   },
   "correct.s.02": {
     "vi": "chuẩn",
@@ -32428,7 +32431,7 @@
     "sw": "wima"
   },
   "right.s.07": {
-    "vi": "phải",
+    "vi": "mặt phải",
     "zh": "正面",
     "ja": "表",
     "ko": "겉",
@@ -32461,7 +32464,8 @@
     "ur": "سیدھا",
     "ta": "வெளி",
     "te": "వెలుపలి",
-    "sw": "nje"
+    "sw": "nje",
+    "en": "right"
   },
   "right.v.01": {
     "vi": "sửa sai",
@@ -33256,9 +33260,9 @@
     "sw": "uwanja wa kulia"
   },
   "right.a.01": {
-    "vi": "phải",
-    "zh": "右边的",
-    "ja": "右の",
+    "vi": "bên phải",
+    "zh": "右边",
+    "ja": "右",
     "ko": "오른쪽의",
     "hi": "दायाँ",
     "es": "derecho",
@@ -33289,7 +33293,8 @@
     "ur": "دایاں",
     "ta": "வலது",
     "te": "కుడి",
-    "sw": "kulia"
+    "sw": "kulia",
+    "en": "right"
   },
   "right.a.04": {
     "vi": "đúng đắn",
@@ -66209,7 +66214,8 @@
     "ur": "عدد",
     "ta": "எண்",
     "te": "సంఖ్య",
-    "sw": "namba"
+    "sw": "namba",
+    "en": "number"
   },
   "number.n.07": {
     "vi": "nhóm",
@@ -101000,8 +101006,8 @@
     "sw": "wafanyabiashara"
   },
   "capable.s.01": {
-    "vi": "có thể",
-    "zh": "能够",
+    "vi": "có khả năng",
+    "zh": "有能力",
     "ja": "可能な",
     "ko": "가능한",
     "hi": "सक्षम",
@@ -101033,7 +101039,8 @@
     "ur": "قابل",
     "ta": "தக்க",
     "te": "సమర్థవంతమైన",
-    "sw": "chenye uwezo"
+    "sw": "chenye uwezo",
+    "en": "capable"
   },
   "clear.s.02": {
     "vi": "thông thoáng",
@@ -110432,7 +110439,7 @@
     "sw": "kupunguza idadi"
   },
   "possibly.r.01": {
-    "vi": "có thể",
+    "vi": "có lẽ",
     "zh": "可能",
     "ja": "もしかすると",
     "ko": "어쩌면",
@@ -110465,7 +110472,8 @@
     "ur": "شاید",
     "ta": "ஒருவேளை",
     "te": "బహుశా",
-    "sw": "labda"
+    "sw": "labda",
+    "en": "maybe"
   },
   "president_of_the_united_states.n.01": {
     "vi": "tổng thống Mỹ",
@@ -112629,9 +112637,9 @@
   },
   "able.a.01": {
     "vi": "có thể",
-    "zh": "能够",
+    "zh": "能",
     "ja": "できる",
-    "ko": "할 수 있는",
+    "ko": "할 수 있다",
     "hi": "सक्षम",
     "es": "capaz",
     "fr": "capable",
@@ -112661,7 +112669,8 @@
     "ur": "اہل",
     "ta": "இயலக்கூடிய",
     "te": "సమర్థవంతమైన",
-    "sw": "mwenye uwezo"
+    "sw": "mwenye uwezo",
+    "en": "can"
   },
   "able.s.01": {
     "vi": "tài giỏi",
@@ -114786,5 +114795,53 @@
     "ta": "உள்ளாட்சி",
     "te": "స్థానిక",
     "sw": "-a kiserikali ya mtaa"
+  },
+  "supposed.s.01": {
+    "vi": "phải",
+    "zh": "必须",
+    "en": "must",
+    "ja": "なければならない"
+  },
+  "church_father.n.01": {
+    "vi": "giáo phụ",
+    "en": "Church Father"
+  },
+  "father.n.01": {
+    "vi": "cha",
+    "en": "father",
+    "zh": "父亲",
+    "ja": "父親"
+  },
+  "credibly.r.01": {
+    "vi": "đáng tin",
+    "en": "probably"
+  },
+  "probably.r.01": {
+    "vi": "có lẽ",
+    "en": "probably"
+  },
+  "follow.v.23": {
+    "vi": "theo kịp",
+    "en": "follow"
+  },
+  "catch.v.18": {
+    "vi": "nắm được",
+    "en": "catch"
+  },
+  "father.n.06": {
+    "vi": "Chúa Cha",
+    "en": "Father"
+  },
+  "sir.n.01": {
+    "vi": "ngài",
+    "en": "sir"
+  },
+  "sir.n.02": {
+    "vi": "ngài",
+    "en": "sir"
+  },
+  "impossible.a.01": {
+    "vi": "bất khả thi",
+    "en": "impossible"
   }
 }

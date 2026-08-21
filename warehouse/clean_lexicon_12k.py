@@ -13,24 +13,13 @@ from __future__ import annotations
 import concurrent.futures
 import gzip
 import json
-import sqlite3
-import sys
-import time
 from pathlib import Path
 from typing import Any
 
 from schema import LANGUAGES
 from warehouse.config import OUT_DIR, ROOT
-from warehouse.curate_tier1 import (
-    OVERRIDES_FILE,
-    apply_proposals,
-    concept_candidates,
-    concept_meta,
-    curate_one,
-    load_overrides,
-    save_overrides,
-)
-from warehouse.export_sqlite import export_sqlite, write_catalog_sqlite
+from warehouse.curate_tier1 import apply_proposals, curate_one, load_overrides, save_overrides
+from warehouse.export_sqlite import write_catalog_sqlite
 from warehouse.build_pedagogical_core import build_pedagogical_catalog
 
 # Known critical overrides for high-frequency learner headwords
@@ -45,6 +34,30 @@ CRITICAL_FOUNDATIONAL_OVERRIDES: dict[str, dict[str, str]] = {
     "air.n.06": {"vi": "không khí", "zh": "空气", "en": "air", "ja": "空気"},
     "correct.s.01": {"vi": "đúng", "zh": "正确", "en": "right", "ja": "正しい"},
     "possible.a.01": {"vi": "có thể", "zh": "可能", "en": "possible", "ja": "可能"},
+    "able.a.01": {"vi": "có thể", "zh": "能", "en": "can", "ja": "できる", "ko": "할 수 있다"},
+    "even.r.03": {"vi": "thậm chí", "zh": "甚至", "en": "even", "ja": "さらに"},
+    "supposed.s.01": {"vi": "phải", "zh": "必须", "en": "must", "ja": "なければならない"},
+    "understand.v.02": {"vi": "hiểu", "zh": "理解", "en": "understand", "ja": "理解する", "ko": "이해하다"},
+    "bunch.n.03": {"vi": "mớ", "zh": "一堆", "en": "bunch", "ja": "ひとまとめ"},
+    "number.n.02": {"vi": "số", "zh": "数", "en": "number", "ja": "数", "ko": "수"},
+    "dress.v.16": {"vi": "bày trí", "zh": "布置", "en": "arrange", "ja": "整える"},
+    "correct.a.01": {"vi": "đúng", "zh": "正确", "en": "right", "ja": "正しい"},
+    "church_father.n.01": {"vi": "giáo phụ", "en": "Church Father"},
+    "father.n.01": {"vi": "cha", "en": "father", "zh": "父亲", "ja": "父親"},
+    "right.a.01": {"vi": "bên phải", "en": "right", "zh": "右边", "ja": "右"},
+    "know.v.09": {"vi": "biết", "en": "know", "zh": "知道", "ja": "知る"},
+    "capable.s.01": {"vi": "có khả năng", "en": "capable", "zh": "有能力"},
+    "possibly.r.01": {"vi": "có lẽ", "en": "maybe"},
+    "credibly.r.01": {"vi": "đáng tin", "en": "probably"},
+    "probably.r.01": {"vi": "có lẽ", "en": "probably"},
+    "see.v.17": {"vi": "nhìn thấu", "en": "see"},
+    "follow.v.23": {"vi": "theo kịp", "en": "follow"},
+    "catch.v.18": {"vi": "nắm được", "en": "catch"},
+    "right.s.07": {"vi": "mặt phải", "en": "right"},
+    "father.n.06": {"vi": "Chúa Cha", "en": "Father"},
+    "sir.n.01": {"vi": "ngài", "en": "sir"},
+    "sir.n.02": {"vi": "ngài", "en": "sir"},
+    "impossible.a.01": {"vi": "bất khả thi", "en": "impossible"},
     "sometimes.r.01": {"vi": "thỉnh thoảng", "zh": "有时", "en": "sometimes", "ja": "時々"},
     "water.n.01": {"vi": "nước", "zh": "水", "en": "water", "ja": "水", "ko": "물"},
     "home.n.01": {"vi": "nhà", "zh": "家", "en": "home", "ja": "家", "ko": "집"},

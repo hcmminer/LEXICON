@@ -152,7 +152,13 @@ FUNCTION_WORDS_BY_LANG = {
     "ko": frozenset("이 그 저 것 수 등 때 및 또 또는 그리고 그러나 그래서 이다 있다 없다 하다".split()),
 }
 
-SHORT_KEEP = frozenset({"go"})
+SHORT_KEEP = frozenset({"go", "can"})
+
+LEARNER_CORE_ENGLISH = frozenset(
+    """
+    can could may might must shall should will would even
+    """.split()
+)
 
 FUNCTION_WORDS = frozenset(
     """
@@ -165,20 +171,19 @@ FUNCTION_WORDS = frozenset(
     be am is are was were been being
     have has had having
     do does did doing done
-    will would shall should can could may might must
     of to in on for and or but if as at by from with
     about into over after before under between through
     during without within against among
     not no nor none never
     so than then there here when where how why
     all each every both few more most other some such
-    only own same too very just also even still
+    only own same too very just also still
     yes ok
     one two three four five
     like up out off down again once here there now then
     any much many get
     """.split()
-)
+) - LEARNER_CORE_ENGLISH
 
 WORDFREQ_LANG = {
     "no": "nb",

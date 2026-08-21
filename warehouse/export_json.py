@@ -12,7 +12,7 @@ from schema import LANGUAGES, SCHEMA_VERSION, SOURCES, WORDNET_POS_TO_OURS, empt
 from warehouse.config import OUT_DIR
 from warehouse.db import connect
 from warehouse.gloss_generator import load_gloss_cache
-from warehouse.textutil import is_function_word, is_usable_lemma
+from warehouse.textutil import is_function_word, is_usable_lemma, lemma_text
 from validate import validate_document, write_coverage
 
 
@@ -127,7 +127,7 @@ def build_catalog(
         if synset_id in grouped:
             concept = grouped[synset_id]
             for lang, text in override_terms.items():
-                if lang in selected_langs and is_usable_lemma(text) and not is_function_word(lang, text):
+                if lang in selected_langs and is_usable_lemma(lemma_text(text)) and not is_function_word(lang, text):
                     if lang in concept["terms"]:
                         concept["terms"][lang]["text"] = text
                     else:

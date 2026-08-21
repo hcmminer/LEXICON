@@ -21,13 +21,19 @@ def normalize(text: str) -> str:
     return clean_lemma(text).casefold()
 
 
-def is_affix_lemma(text: str) -> bool:
-    stripped = text.strip()
+def lemma_text(text: object) -> str:
+    if isinstance(text, list):
+        text = text[0] if text else ""
+    return str(text or "").strip()
+
+
+def is_affix_lemma(text: object) -> bool:
+    stripped = lemma_text(text)
     return bool(stripped) and (stripped.startswith("-") or stripped.endswith("-"))
 
 
-def is_usable_lemma(text: str) -> bool:
-    stripped = (text or "").strip()
+def is_usable_lemma(text: object) -> bool:
+    stripped = lemma_text(text)
     if not stripped or len(stripped) > 40:
         return False
     if any(ch.isdigit() for ch in stripped) or FULLWIDTH_ALNUM_RE.search(stripped):
@@ -71,8 +77,8 @@ def script_ok(lang: str, text: str) -> bool:
     return any(ch.isalpha() and ord(ch) < 0x300 for ch in text)
 
 
-def is_function_word(lang: str, word: str) -> bool:
-    folded = word.casefold().strip()
+def is_function_word(lang: str, word: object) -> bool:
+    folded = lemma_text(word).casefold()
     if not folded:
         return True
 
