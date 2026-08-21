@@ -50,7 +50,7 @@ def build_pedagogical_catalog(top_n: int = 6000, pivot: str | None = None) -> di
     gloss_cache = load_gloss_cache()
     cleaned_concepts: list[dict[str, Any]] = []
 
-    # Banned obscure / archaic / specialized sense indicators
+    # Banned obscure / archaic / specialized / vulgar sense indicators
     BANNED_MEANING_SUBSTRINGS = (
         "algonquian language",
         "member of an algonquian",
@@ -62,13 +62,29 @@ def build_pedagogical_catalog(top_n: int = 6000, pivot: str | None = None) -> di
         "archaic",
         "historical region",
         "monetary unit of",
+        "slang for sexual",
+        "copulate with",
+        "vulgar slang",
+        "coitus",
+        "intercourse",
+        "preserve in a can or tin",
     )
+
+    BANNED_SYNSETS = frozenset({
+        "fuck.n.01",
+        "fuck.v.01",
+        "can.v.01",
+        "circus_tent.n.01",
+        "blue.s.08",
+    })
 
     for concept in raw.get("concepts", []):
         cid = concept.get("id", "")
+        if cid in BANNED_SYNSETS:
+            continue
         meaning = concept.get("meaning", "").lower()
         
-        # Skip obscure scientific / tribal / archaic micro-synsets
+        # Skip obscure scientific / tribal / archaic / vulgar micro-synsets
         if any(b in meaning for b in BANNED_MEANING_SUBSTRINGS):
             continue
 

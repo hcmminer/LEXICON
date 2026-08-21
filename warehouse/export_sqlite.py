@@ -59,7 +59,7 @@ def write_catalog_sqlite(catalog: dict[str, Any], dest: Path) -> Path:
                 if not text or rank < 1 or not is_usable_lemma(text):
                     continue
                 readings = term.get("readings")
-                meaning = str(term.get("meaning") or "").strip() or None
+                meaning = str(term.get("meaning") or "").strip() or str(concept.get("meaning") or "").strip() or None
                 terms.append(
                     (
                         concept["id"],
