@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from phonology import LANGUAGE_PHONOLOGY, phonology_dto
 from schema import LANGUAGES, WORDNET_POS_TO_OURS
 from warehouse.export_json import build_catalog, export_json
+from warehouse.export_sqlite import write_catalog_sqlite
 from warehouse.curate_tier1 import apply_proposals, ambiguous_synsets, run_curation_batch
 from warehouse.ingest.readings import ingest_readings
 from warehouse.ingest.seed import seed_reference_data
@@ -79,13 +80,14 @@ def catalog(
     lang: str = Query("zh"),
     q: str = Query(""),
     max_rank: int = Query(3000),
+    distinct: bool = Query(False),
     page: int = Query(1, ge=1),
 ):
     if lang not in LANGUAGES:
         lang = "zh"
     max_rank = min(max(max_rank, 1), 100000)
     limit = 40
-    rows, total = search_catalog(lang, q, max_rank, limit=limit, offset=(page - 1) * limit)
+    rows, total = search_catalog(lang, q, max_rank, limit=limit, offset=(page - 1) * limit, distinct=distinct)
     pages = max((total + limit - 1) // limit, 1)
     return templates.TemplateResponse(
         request,
@@ -96,6 +98,7 @@ def catalog(
             lang=lang,
             q=q,
             max_rank=max_rank,
+            distinct=distinct,
             rows=rows,
             total=total,
             page=page,
@@ -167,13 +170,27 @@ def export_download(
     catalog = build_catalog(top_n=top_n, pivot=pivot, target_langs=target_langs)
     import gzip
     import json
+    import tempfile
 
-    raw = json.dumps(catalog, ensure_ascii=False, indent=2).encode("utf-8")
-    if fmt == "gz":
+    if fmt in ("sqlite", "db", "sqlite_gz"):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            write_catalog_sqlite(catalog, tmp_path)
+            raw_bytes = tmp_path.read_bytes()
+            payload = gzip.compress(raw_bytes, compresslevel=9)
+            media = "application/gzip"
+            name = f"core_vocabulary.{pivot}-{catalog['count']}.db.gz"
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink()
+    elif fmt == "gz":
+        raw = json.dumps(catalog, ensure_ascii=False, indent=2).encode("utf-8")
         payload = gzip.compress(raw)
         media = "application/gzip"
         name = f"core_vocabulary.{pivot}-{catalog['count']}.json.gz"
     else:
+        raw = json.dumps(catalog, ensure_ascii=False, indent=2).encode("utf-8")
         payload = raw
         media = "application/json"
         name = f"core_vocabulary.{pivot}-{catalog['count']}.json"

@@ -19,6 +19,10 @@
   <label>Max rank
     <input type="number" name="max_rank" value="{{ max_rank }}" min="1" max="100000">
   </label>
+  <label class="checkbox-filter">
+    <input type="checkbox" name="distinct" value="true" {% if distinct %}checked{% endif %}>
+    <span>Distinct Headwords</span>
+  </label>
   <label class="grow">Search
     <input type="search" name="q" value="{{ q }}" placeholder="lemma, synset, gloss">
   </label>
@@ -26,7 +30,7 @@
 </form>
 
 <table>
-  <thead><tr><th>Rank</th><th>Lemma</th><th>POS</th><th>Synset</th><th>Meaning</th></tr></thead>
+  <thead><tr><th>Rank</th><th>Lemma</th><th>POS</th><th>Synset</th><th>Native Gloss ({{ lang }})</th><th>English Def</th></tr></thead>
   <tbody>
   {% for row in rows %}
     <tr>
@@ -34,7 +38,8 @@
       <td><a href="/catalog/{{ row.id }}">{{ row.text }}</a></td>
       <td>{{ pos_map.get(row.pos, row.pos) }}</td>
       <td class="mono"><a href="/catalog/{{ row.id }}">{{ row.id }}</a></td>
-      <td class="clip">{{ row.definition_en }}</td>
+      <td class="clip">{% if row.native_gloss %}<b>{{ row.native_gloss }}</b>{% else %}<span class="null">—</span>{% endif %}</td>
+      <td class="clip muted">{{ row.definition_en }}</td>
     </tr>
   {% endfor %}
   </tbody>
@@ -42,9 +47,9 @@
 
 {% if pages > 1 %}
 <nav class="pager">
-  {% if page > 1 %}<a href="?lang={{ lang }}&max_rank={{ max_rank }}&q={{ q }}&page={{ page - 1 }}">Prev</a>{% endif %}
+  {% if page > 1 %}<a href="?lang={{ lang }}&max_rank={{ max_rank }}&distinct={{ 'true' if distinct else 'false' }}&q={{ q }}&page={{ page - 1 }}">Prev</a>{% endif %}
   <span>Page {{ page }} / {{ pages }}</span>
-  {% if page < pages %}<a href="?lang={{ lang }}&max_rank={{ max_rank }}&q={{ q }}&page={{ page + 1 }}">Next</a>{% endif %}
+  {% if page < pages %}<a href="?lang={{ lang }}&max_rank={{ max_rank }}&distinct={{ 'true' if distinct else 'false' }}&q={{ q }}&page={{ page + 1 }}">Next</a>{% endif %}
 </nav>
 {% endif %}
 {% endblock %}

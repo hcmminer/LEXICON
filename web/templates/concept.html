@@ -14,6 +14,7 @@
       <th>Lang</th>
       <th>Text</th>
       <th>Rank</th>
+      <th>Native Meaning / Gloss</th>
       <th>Pronunciation slots</th>
     </tr>
   </thead>
@@ -22,8 +23,9 @@
     {% set term = terms.get(lang) %}
     <tr>
       <td class="mono">{{ lang }}</td>
-      <td>{% if term %}{{ term.text }}{% else %}<span class="null">null</span>{% endif %}</td>
+      <td>{% if term %}<b>{{ term.text }}</b>{% else %}<span class="null">null</span>{% endif %}</td>
       <td class="num">{% if term %}{{ term.rank }}{% else %}<span class="null">—</span>{% endif %}</td>
+      <td class="clip">{% if term and term.native_gloss %}{{ term.native_gloss }}{% else %}<span class="null">—</span>{% endif %}</td>
       <td>
         {% for system in phonology[lang].systems %}
           {% set value = (term.readings or {}).get(system.id) if term and term.readings else None %}

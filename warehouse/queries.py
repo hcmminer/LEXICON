@@ -4,6 +4,7 @@ from typing import Any
 
 from schema import LANGUAGES
 from warehouse.db import connect
+from warehouse.gloss_generator import load_gloss_cache
 
 
 def warehouse_stats() -> dict[str, Any]:
@@ -52,37 +53,93 @@ def warehouse_stats() -> dict[str, Any]:
     }
 
 
-def search_catalog(lang: str, q: str, max_rank: int, limit: int = 40, offset: int = 0) -> tuple[list[dict[str, Any]], int]:
+def search_catalog(
+    lang: str,
+    q: str,
+    max_rank: int,
+    limit: int = 40,
+    offset: int = 0,
+    distinct: bool = False,
+) -> tuple[list[dict[str, Any]], int]:
     query = f"%{q.strip()}%" if q.strip() else None
+    gloss_cache = load_gloss_cache()
     with connect() as conn:
-        total = conn.execute(
-            """
-            SELECT COUNT(*)::int AS n
-            FROM core.concept_ranks cr
-            JOIN core.lemmas l ON l.id = cr.lemma_id
-            JOIN core.synsets s ON s.id = cr.synset_id
-            WHERE cr.lang = %s AND cr.rank <= %s
-              AND (%s::text IS NULL OR l.text ILIKE %s OR s.id ILIKE %s OR s.definition_en ILIKE %s)
-            """,
-            (lang, max_rank, query, query, query, query),
-        ).fetchone()["n"]
-        rows = conn.execute(
-            """
-            SELECT s.id, s.pos, s.definition_en, l.text, cr.rank
-            FROM core.concept_ranks cr
-            JOIN core.lemmas l ON l.id = cr.lemma_id
-            JOIN core.synsets s ON s.id = cr.synset_id
-            WHERE cr.lang = %s AND cr.rank <= %s
-              AND (%s::text IS NULL OR l.text ILIKE %s OR s.id ILIKE %s OR s.definition_en ILIKE %s)
-            ORDER BY cr.rank
-            LIMIT %s OFFSET %s
-            """,
-            (lang, max_rank, query, query, query, query, limit, offset),
-        ).fetchall()
-    return rows, total
+        if distinct:
+            total = conn.execute(
+                """
+                SELECT COUNT(*)::int AS n
+                FROM (
+                    SELECT cr.synset_id, l.text,
+                           ROW_NUMBER() OVER (PARTITION BY l.text ORDER BY cr.rank, cr.synset_id) as rn
+                    FROM core.concept_ranks cr
+                    JOIN core.lemmas l ON l.id = cr.lemma_id
+                    JOIN core.synsets s ON s.id = cr.synset_id
+                    WHERE cr.lang = %s AND cr.rank <= %s
+                      AND (%s::text IS NULL OR l.text ILIKE %s OR s.id ILIKE %s OR s.definition_en ILIKE %s)
+                ) sub
+                WHERE rn = 1
+                """,
+                (lang, max_rank, query, query, query, query),
+            ).fetchone()["n"]
+            rows = conn.execute(
+                """
+                SELECT s.id, s.pos, s.definition_en, l.text, cr.rank
+                FROM (
+                    SELECT cr.synset_id, cr.lemma_id, cr.rank,
+                           ROW_NUMBER() OVER (PARTITION BY l.text ORDER BY cr.rank, cr.synset_id) as rn
+                    FROM core.concept_ranks cr
+                    JOIN core.lemmas l ON l.id = cr.lemma_id
+                    JOIN core.synsets s ON s.id = cr.synset_id
+                    WHERE cr.lang = %s AND cr.rank <= %s
+                      AND (%s::text IS NULL OR l.text ILIKE %s OR s.id ILIKE %s OR s.definition_en ILIKE %s)
+                ) sub
+                JOIN core.concept_ranks cr ON cr.synset_id = sub.synset_id AND cr.lemma_id = sub.lemma_id AND cr.lang = %s
+                JOIN core.lemmas l ON l.id = cr.lemma_id
+                JOIN core.synsets s ON s.id = cr.synset_id
+                WHERE sub.rn = 1
+                ORDER BY cr.rank
+                LIMIT %s OFFSET %s
+                """,
+                (lang, max_rank, query, query, query, query, lang, limit, offset),
+            ).fetchall()
+        else:
+            total = conn.execute(
+                """
+                SELECT COUNT(*)::int AS n
+                FROM core.concept_ranks cr
+                JOIN core.lemmas l ON l.id = cr.lemma_id
+                JOIN core.synsets s ON s.id = cr.synset_id
+                WHERE cr.lang = %s AND cr.rank <= %s
+                  AND (%s::text IS NULL OR l.text ILIKE %s OR s.id ILIKE %s OR s.definition_en ILIKE %s)
+                """,
+                (lang, max_rank, query, query, query, query),
+            ).fetchone()["n"]
+            rows = conn.execute(
+                """
+                SELECT s.id, s.pos, s.definition_en, l.text, cr.rank
+                FROM core.concept_ranks cr
+                JOIN core.lemmas l ON l.id = cr.lemma_id
+                JOIN core.synsets s ON s.id = cr.synset_id
+                WHERE cr.lang = %s AND cr.rank <= %s
+                  AND (%s::text IS NULL OR l.text ILIKE %s OR s.id ILIKE %s OR s.definition_en ILIKE %s)
+                ORDER BY cr.rank
+                LIMIT %s OFFSET %s
+                """,
+                (lang, max_rank, query, query, query, query, limit, offset),
+            ).fetchall()
+
+    result_rows: list[dict[str, Any]] = []
+    for r in rows:
+        row_dict = dict(r)
+        cid = row_dict["id"]
+        row_dict["native_gloss"] = gloss_cache.get(cid, {}).get(lang)
+        result_rows.append(row_dict)
+
+    return result_rows, total
 
 
 def get_concept(synset_id: str) -> dict[str, Any] | None:
+    gloss_cache = load_gloss_cache()
     with connect() as conn:
         synset = conn.execute(
             "SELECT id, pos, definition_en FROM core.synsets WHERE id = %s",
@@ -105,4 +162,11 @@ def get_concept(synset_id: str) -> dict[str, Any] | None:
             """,
             (synset_id,),
         ).fetchall()
-    return {"synset": synset, "terms": {row["lang"]: row for row in terms}}
+
+    terms_map = {}
+    for row in terms:
+        d = dict(row)
+        d["native_gloss"] = gloss_cache.get(synset_id, {}).get(d["lang"])
+        terms_map[d["lang"]] = d
+
+    return {"synset": synset, "terms": terms_map}
